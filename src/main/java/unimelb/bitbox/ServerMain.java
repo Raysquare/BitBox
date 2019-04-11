@@ -8,8 +8,10 @@ import unimelb.bitbox.util.Configuration;
 import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemObserver;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
+import unimelb.bitbox.util.Protocol;
 
 public class ServerMain implements FileSystemObserver {
+
 	private static Logger log = Logger.getLogger(ServerMain.class.getName());
 	protected FileSystemManager fileSystemManager;
 	
@@ -20,6 +22,11 @@ public class ServerMain implements FileSystemObserver {
 	@Override
 	public void processFileSystemEvent(FileSystemEvent fileSystemEvent) {
 		// TODO: process events
+		// 	private
+		switch (fileSystemEvent.event){
+			case FILE_CREATE:
+				// Document doc = Protocol.creatFileCreationEvent()
+		}
 	}
 	
 }

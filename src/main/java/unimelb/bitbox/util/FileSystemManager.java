@@ -54,14 +54,14 @@ import java.util.logging.Logger;
  */
 public class FileSystemManager extends Thread {
 	private static Logger log = Logger.getLogger(FileSystemManager.class.getName());
-	
+
 	/**
 	 * The special suffix on file names for loading files. Any files in the
 	 * share directory with this suffix will never generate file system events,
 	 * as they are ignored by the file system monitor.
 	 */
 	public final String loadingSuffix = "(bitbox)";
-	
+
 	/**
 	 * Possible file system events.
 	 * <li>{@link #FILE_CREATE}</li>
@@ -96,7 +96,7 @@ public class FileSystemManager extends Thread {
 		 */
 		DIRECTORY_DELETE
 	}
-	
+
 	/**
 	 * Describes the case when a file is
 	 * created/deleted/modified or when a directory is created/deleted.
@@ -129,7 +129,7 @@ public class FileSystemManager extends Thread {
 		 * Additional information for the file/directory.
 		 */
 		public FileDescriptor fileDescriptor;
-		
+
 		/**
 		 * Constructor for file events.
 		 * @param path The path to the file, including the share directory.
@@ -145,7 +145,7 @@ public class FileSystemManager extends Thread {
 			pathName=pathName.substring(root.length()+1);
 			this.event=event;
 		}
-		
+
 		/**
 		 * Constructor for directory events.
 		 * @param path The path to the directory, including the share directory.
@@ -159,15 +159,15 @@ public class FileSystemManager extends Thread {
 			pathName=pathName.substring(root.length()+1);
 			this.event=event;
 		}
-		
+
 		public String toString() {
 			return event.name()+" " +pathName;
 		}
 	}
-	
+
 	/**
 	 * Additional information about a given file.
-	 * 
+	 *
 	 */
 	public class FileDescriptor {
 		/**
@@ -182,7 +182,7 @@ public class FileSystemManager extends Thread {
 		 * The size of the file in bytes.
 		 */
 		public long fileSize;
-		
+
 		/**
 		 * Constructor
 		 * @param lastModified the timestamp for when file was last modified
@@ -205,7 +205,7 @@ public class FileSystemManager extends Thread {
 			return doc;
 		}
 	}
-	
+
 	/**
 	 * Construct a new file system manager. If the supplied share directory is not a directory
 	 * that exists then the constructor will return without starting the monitor thread.
@@ -232,13 +232,13 @@ public class FileSystemManager extends Thread {
 		log.info("starting file system monitor thread");
 		start();
 	}
-	
+
 
 	//////////////////
 	// File System API
 	//////////////////
-	
-	
+
+
 	/**
 	   * Returns true if the path name is "safe" to be used.
 	   * Unsafe names should not be used as they may access
@@ -263,9 +263,9 @@ public class FileSystemManager extends Thread {
 		return cannonicalName.startsWith(cannonicalRoot+FileSystems.getDefault().getSeparator()) &&
 				cannonicalName.length()>cannonicalRoot.length()+1;
 	}
-	
+
 	// directories
-	
+
 	/**
 	   * Returns true if the directory name exists.
 	   * @param pathName The name of the directory to test for, relative
@@ -278,12 +278,12 @@ public class FileSystemManager extends Thread {
 			return watchedDirectories.contains(root+FileSystems.getDefault().getSeparator()+pathName);
 		}
 	}
-	
+
 
 	/**
 	   * Attempts to make a directory, the parent of the directory
 	   * must already exist.
-	   * @param pathName The name of the directory to make, relative 
+	   * @param pathName The name of the directory to make, relative
 	   * to the share directory.
 	   * @return boolean True if directory was successfully made.
 	   */
@@ -294,11 +294,11 @@ public class FileSystemManager extends Thread {
 			return file.mkdir();
 		}
 	}
-	
+
 	/**
 	   * Attempts to delete a directory, the directory must be
-	   * empty. 
-	   * @param pathName The name of the directory to delete, relative 
+	   * empty.
+	   * @param pathName The name of the directory to delete, relative
 	   * to the share directory.
 	   * @return boolean True if the directory was successfully deleted.
 	   */
@@ -311,12 +311,12 @@ public class FileSystemManager extends Thread {
 			} else return false;
 		}
 	}
-	
+
 	// files
-	
+
 	/**
 	   * Test if the file exists, ignoring the contents of the file.
-	   * @param pathName The name of the file to test for, relative 
+	   * @param pathName The name of the file to test for, relative
 	   * to the share directory.
 	   * @return boolean True if the file exists. In the case of
 	   *  a file that is being created and currently loading, returns
@@ -329,10 +329,10 @@ public class FileSystemManager extends Thread {
 			return watchedFiles.containsKey(root+FileSystems.getDefault().getSeparator()+pathName);
 		}
 	}
-	
+
 	/**
 	 * Test if the file exists and is has matching content.
-	 * @param pathName The name of the file to test for, relative 
+	 * @param pathName The name of the file to test for, relative
 	   * to the share directory.
 	 * @param md5 The MD5 hash of the file's contents to be matched.
 	 * @return True if the file exists. In the case of
@@ -348,14 +348,14 @@ public class FileSystemManager extends Thread {
 					watchedFiles.get(fullPathName).md5.equals(md5);
 		}
 	}
-	
+
 	/**
 	   * Attempt to delete a file. The file must exist and it must
 	   * have a last modified timestamp less than or equal to that supplied.
 	   * @param pathName The name of the file to delete, relative to
 	   * the share directory.
 	   * @param lastModified The timestamp to check against.
-	   * @param md5 The MD5 hash of content to match against. 
+	   * @param md5 The MD5 hash of content to match against.
 	   * @return boolean True if the file was deleted.
 	   */
 	public boolean deleteFile(String pathName, long lastModified, String md5) {
@@ -372,7 +372,7 @@ public class FileSystemManager extends Thread {
 			} else return false;
 		}
 	}
-	
+
 	/**
 	   * Create a file loader for given file name. The file name must not
 	   * already exist, otherwise use {@link #modifyFileLoader(String, String, long)}.
@@ -400,7 +400,7 @@ public class FileSystemManager extends Thread {
 		}
 		return true;
 	}
-	
+
 	/**
 	 * Requests the file loader for the associated file name to write the supplied byte buffer
 	 * at the supplied position in the loader file.
@@ -420,13 +420,13 @@ public class FileSystemManager extends Thread {
 		}
 		return true;
 	}
-	
+
 	/**
 	 * Read bytes from any file containing the matching specific content.
 	 * @param md5 The MD5 hash of the content of the file to read from.
 	 * @param position The position in the file to start reading from.
 	 * @param length The number of bytes to read.
-	 * @return A {@link java.nio.ByteBuffer} if the bytes are successfully read, otherwise null if 
+	 * @return A {@link java.nio.ByteBuffer} if the bytes are successfully read, otherwise null if
 	 * there was no such file with that content.
 	 * @throws IOException If there were any problems accessing the file system.
 	 * @throws NoSuchAlgorithmException  If the MD5 hash algorithm is unavailable.
@@ -463,7 +463,7 @@ public class FileSystemManager extends Thread {
 			return null;
 		}
 	}
-	
+
 	/**
 	 * Requests the file loader for the associated file name to check if all of the content for the file
 	 * has been written. It does this by checking the MD5 hash of the written bytes to see if
@@ -497,7 +497,7 @@ public class FileSystemManager extends Thread {
 			return check;
 		}
 	}
-	
+
 	/**
 	 * Should be called directly after creating a file loader, but can be called at any time.
 	 * Requests the file loader to check if another file already exists with the same content,
@@ -530,7 +530,7 @@ public class FileSystemManager extends Thread {
 			return check;
 		}
 	}
-	
+
 	/**
 	 * Called to create a file loader in the case when a file name already exists. The existing
 	 * file must have a last modified timestamp that is less than or equal to the supplied one. See
@@ -541,7 +541,7 @@ public class FileSystemManager extends Thread {
 	 * @param lastModified The existing file's timestamp must be less than this time stamp
 	 * for the loader to be successfully created.
 	 * @return True if the loader was successfully created.
-	 * @throws IOException If there were any errors accessing the file system. 
+	 * @throws IOException If there were any errors accessing the file system.
 	 */
 	public boolean modifyFileLoader(String pathName, String md5, long lastModified) throws IOException {
 		pathName=separatorsToSystem(pathName);
@@ -556,11 +556,11 @@ public class FileSystemManager extends Thread {
 		}
 		return true;
 	}
-	
+
 	/**
 	 * Cancel a file loader. Removes the file loader if present, including the loader file.
 	 * No other actions are taken.
-	 * @param pathName The name of the file loader, i.e. the associated file it was trying to load. 
+	 * @param pathName The name of the file loader, i.e. the associated file it was trying to load.
 	 * @return True if the file loader existed and was cancelled without problem, false otherwise. The loader is no longer available in any case.
 	 * @throws IOException if there was a problem accessing the file system, the loader is no longer available in this case.
 	 */
@@ -584,9 +584,9 @@ public class FileSystemManager extends Thread {
 		}
 		return false;
 	}
-	
+
 	// synchronization
-	
+
 	/**
 	 * Typically called at the beginning of a connection, in order to ensure that
 	 * the remote directory has all of the same contents as the local directory.
@@ -603,7 +603,7 @@ public class FileSystemManager extends Thread {
 			}
 			Collections.sort(pathevents,(arg0,arg1) ->
 				{
-					return arg0.path.length()-arg1.path.length();	
+					return arg0.path.length()-arg1.path.length();
 				}
 			);
 			keys = new ArrayList<String>(watchedFiles.keySet());
@@ -614,18 +614,18 @@ public class FileSystemManager extends Thread {
 			return pathevents;
 		}
 	}
-	
+
 	////////////////////
 	// Internals
 	////////////////////
-	
+
 	private class FileLoader {
 		private String md5;
 		private long length;
 		private long lastModified;
 		private String pathName;
 		private FileChannel channel;
-		private FileLock lock; 
+		private FileLock lock;
 		private File file;
 		private RandomAccessFile raf;
 		public FileLoader(String pathName, String md5, long length, long lastModified) throws IOException {
@@ -641,14 +641,14 @@ public class FileSystemManager extends Thread {
 			channel = raf.getChannel();
 			lock = channel.lock();
 		}
-		
+
 		public boolean cancel() throws IOException {
 			lock.release();
 			channel.close();
 			raf.close();
 			return file.delete();
 		}
-		
+
 		public boolean checkShortcut() throws NoSuchAlgorithmException, IOException {
 			// check for a shortcut
 			boolean success=false;
@@ -719,14 +719,14 @@ public class FileSystemManager extends Thread {
 	private String root;
 	private String cannonicalRoot;
 	private HashMap<String,FileLoader> loadingFiles;
-	
-	
-	
-	
+
+
+
+
 	public void run() {
 		ArrayList<FileSystemEvent> pathevents=new ArrayList<FileSystemEvent>();
 		while (!isInterrupted()) {
-			
+
 			pathevents.clear();
 			// check for new/modified files
 			try {
@@ -744,7 +744,7 @@ public class FileSystemManager extends Thread {
 				log.info(pathevent.toString());
 				fileSystemObserver.processFileSystemEvent(pathevent);
 			}
-			
+
 			// check for deleted files
 			pathevents.clear();
 			synchronized(this) {
@@ -757,7 +757,7 @@ public class FileSystemManager extends Thread {
 						pathevents.add(new FileSystemEvent(file.getParent(),file.getName(),EVENT.FILE_DELETE,fdes));
 					}
 				}
-				
+
 				// check for deleted directories
 				keys = new ArrayList<String>(watchedDirectories);
 				for(String pathname : keys) {
@@ -771,25 +771,25 @@ public class FileSystemManager extends Thread {
 			// sort all of the events so they make sense
 			Collections.sort(pathevents,(arg0,arg1) ->
 				{
-					return arg1.path.length()-arg0.path.length();	
+					return arg1.path.length()-arg0.path.length();
 				}
 			);
-			
+
 			for(FileSystemEvent pathevent : pathevents) {
 				log.info(pathevent.toString());
 				fileSystemObserver.processFileSystemEvent(pathevent);
 			}
-			
+
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				log.warning(e.getMessage());
 			}
-			
+
 		}
-		
+
 	}
-	
+
 	private String hashFile(File file,String name,long lastModified) throws NoSuchAlgorithmException, IOException {
 		log.info("hashing file "+name);
 		if(lastModified!=0 && lastModified==file.lastModified()) {
@@ -799,7 +799,7 @@ public class FileSystemManager extends Thread {
 		String checksum = getFileChecksum(md5Digest, file);
 		return checksum;
 	}
-	
+
 	private String hashFile(File file,String name,long lastModified, RandomAccessFile raf) throws NoSuchAlgorithmException, IOException {
 		log.info("hashing file "+name);
 		if(lastModified!=0 && lastModified==file.lastModified()) {
@@ -809,7 +809,7 @@ public class FileSystemManager extends Thread {
 		String checksum = getFileChecksum(md5Digest, raf);
 		return checksum;
 	}
-	
+
 	private ArrayList<FileSystemEvent> scanDirectoryTree(String name) throws IOException, NoSuchAlgorithmException {
 		ArrayList<FileSystemEvent> pathEvents = new ArrayList<FileSystemEvent>();
 		if(name.endsWith(loadingSuffix)) return pathEvents;
@@ -848,20 +848,20 @@ public class FileSystemManager extends Thread {
 		}
 		return pathEvents;
 	}
-	
+
 	private void removeHash(String name) {
 		HashSet<String> hs = hashMap.get(watchedFiles.get(name).md5);
 		hs.remove(name);
 		if(hs.size()==0) hs.remove(watchedFiles.get(name).md5);
 	}
-	
+
 	private void addHash(String md5, String name) {
 		if(!hashMap.containsKey(md5)) {
 			hashMap.put(md5, new HashSet<String>());
 		}
 		hashMap.get(md5).add(name);
 	}
-	
+
 	private void modifyFile(String name, String md5, long lastModified, long fileSize) {
 		log.info("modified file "+name);
 		removeHash(name);
@@ -870,29 +870,29 @@ public class FileSystemManager extends Thread {
 		watchedFiles.get(name).fileSize=fileSize;
 		addHash(md5,name);
 	}
-	
+
 	private void dropFile(String name) {
 		log.info("dropping file "+name);
 		removeHash(name);
 		watchedFiles.remove(name);
 	}
-	
+
 	private void addFile(String name, FileDescriptor fileDescriptor) {
 		log.info("adding file "+name);
 		addHash(fileDescriptor.md5,name);
 		watchedFiles.put(name,fileDescriptor);
 	}
-	
+
 	private void dropDir(String name) {
 		log.info("dropping directory "+name);
 		watchedDirectories.remove(name);
 	}
-	
+
 	private void addDir(String name) {
 		log.info("adding new directory "+name);
 		watchedDirectories.add(name);
 	}
-	
+
 	private static String getFileChecksum(MessageDigest digest, RandomAccessFile fis) throws IOException
 	{
 	    byte[] byteArray = new byte[1024];
@@ -909,7 +909,7 @@ public class FileSystemManager extends Thread {
 	    }
 	   return sb.toString();
 	}
-	
+
 	private static String getFileChecksum(MessageDigest digest, File file) throws IOException
 	{
 		FileInputStream fis = new FileInputStream(file);
@@ -927,7 +927,7 @@ public class FileSystemManager extends Thread {
 	    }
 	   return sb.toString();
 	}
-	
+
 	private static String separatorsToSystem(String res) {
 	    if (res==null) return null;
 	    if (File.separatorChar=='\\') {
