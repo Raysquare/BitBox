@@ -54,9 +54,6 @@
 # .idea/*.iml
 # .idea/modules
 
-# CMake
-cmake-build-*/
-
 # Mongo Explorer plugin
 .idea/**/mongoSettings.xml
 
@@ -97,3 +94,4 @@ src/main/.DS_Store
 src/main/java/.DS_Store
 src/main/java/unimelb/.DS_Store
 src/main/java/unimelb/bitbox/.DS_Store
+/target/
