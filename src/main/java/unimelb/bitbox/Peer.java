@@ -52,15 +52,15 @@ public class Peer implements FileSystemObserver
                 Socket socket = new Socket(ip, port);
                 String clientAddress = socket.getInetAddress().getHostAddress();
                 int clientPort = socket.getPort();
+                log.info("[LocalPeer] Connected to " + peer);
 
                 ServerMain serverThread = new ServerMain(this, socket, localHost, new HostPort(clientAddress, clientPort));
                 serverThread.sendHandshakeRequest();
                 serverThread.start(); // start the thread
                 connectedPeers.add(serverThread);
-                log.info("Connected to " + clientAddress);
 
             } catch (IOException e) {
-                log.info("Failed to connect to " + peer);
+                log.info("[LocalPeer] Failed to connect to " + peer);
             }
         }
     }
@@ -74,7 +74,7 @@ public class Peer implements FileSystemObserver
 
         new Timer().scheduleAtFixedRate(new TimerTask() {
             public void run() {
-                log.info("Sync events generated");
+                log.info("[LocalPeer] Synchronization events were generated");
                 for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
                     processFileSystemEvent(event);
             }
