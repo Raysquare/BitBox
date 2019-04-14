@@ -4,7 +4,6 @@ import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import javax.net.ServerSocketFactory;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -55,10 +54,10 @@ public class Peer implements FileSystemObserver
                 int clientPort = socket.getPort();
 
                 ServerMain serverThread = new ServerMain(this, socket, localHost, new HostPort(clientAddress, clientPort));
-                log.info("connecting to " + clientAddress);
                 serverThread.sendHandshakeRequest();
                 serverThread.start(); // start the thread
                 connectedPeers.add(serverThread);
+                log.info("Connected to " + clientAddress);
 
             } catch (IOException e) {
                 log.info("Failed to connect to " + peer);

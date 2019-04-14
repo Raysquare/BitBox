@@ -40,7 +40,6 @@ public class ServerMain extends Thread implements FileSystemObserver
 	{
 		Document handshakeRequest = Protocol.createHandshakeRequest(serverHostPort);
 		output.writeUTF(handshakeRequest.toJson());
-		output.flush();
 	}
 
 	public void processFileSystemEvent(FileSystemEvent fileSystemEvent)
