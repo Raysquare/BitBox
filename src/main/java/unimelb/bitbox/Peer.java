@@ -54,12 +54,11 @@ public class Peer implements FileSystemObserver
                 String clientAddress = socket.getInetAddress().getHostAddress();
                 int clientPort = socket.getPort();
 
-                Document handshakeRequest = Protocol.createHandshakeRequest(localHost);
-                DataOutputStream output = new DataOutputStream(socket.getOutputStream());
-                output.writeUTF(handshakeRequest.toJson());
-                output.close();
-
-                connectedPeers.add(new ServerMain(this, socket, localHost, new HostPort(clientAddress, clientPort)));
+                ServerMain serverThread = new ServerMain(this, socket, localHost, new HostPort(clientAddress, clientPort));
+                log.info("connecting to " + clientAddress);
+                serverThread.sendHandshakeRequest();
+                serverThread.start(); // start the thread
+                connectedPeers.add(serverThread);
 
             } catch (IOException e) {
                 log.info("Failed to connect to " + peer);
@@ -99,7 +98,9 @@ public class Peer implements FileSystemObserver
             // create a new thread and put it into 'connectedPeer' after getting a connection
             String clientAddress = socket.getInetAddress().getHostAddress();
             int clientPort = socket.getPort();
-            connectedPeers.add(new ServerMain(this, socket, localHost, new HostPort(clientAddress, clientPort)));
+            ServerMain serverThread = new ServerMain(this, socket, localHost, new HostPort(clientAddress, clientPort));
+            serverThread.start();
+            connectedPeers.add(serverThread);
         }
     }
 

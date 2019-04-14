@@ -34,8 +34,13 @@ public class ServerMain extends Thread implements FileSystemObserver
 		this.clientHostPort = clientHostPort;
 		input = new DataInputStream(socket.getInputStream());
 		output = new DataOutputStream(socket.getOutputStream());
+	}
 
-		start(); // start the thread
+	public void sendHandshakeRequest() throws IOException
+	{
+		Document handshakeRequest = Protocol.createHandshakeRequest(serverHostPort);
+		output.writeUTF(handshakeRequest.toJson());
+		output.flush();
 	}
 
 	public void processFileSystemEvent(FileSystemEvent fileSystemEvent)
@@ -57,12 +62,17 @@ public class ServerMain extends Thread implements FileSystemObserver
 		}
 	}
 
-	private void close() throws IOException
+	private void close()
 	{
-		input.close();
-		output.close();;
-		socket.close();
-		localPeer.removeFromConnectedPeers(this);
+		try {
+			input.close();
+			output.close();
+			socket.close();
+		} catch (IOException e) {
+			log.info("Unable to the socket: " + clientHostPort.toString());
+		} finally {
+			localPeer.removeFromConnectedPeers(this);
+		}
 	}
 
 	/*
@@ -76,8 +86,7 @@ public class ServerMain extends Thread implements FileSystemObserver
 			while (true) {
 				Document JSON = Document.parse(input.readUTF());
 
-
-				if (Protocol.isValid(JSON)) {
+				if (!Protocol.isValid(JSON)) {
 					log.info("Invalid protocol: the message misses required fields" + clientHostPort.toString());
 					Document errorMsg = Protocol.createInvalidProtocol("Invalid protocol: the message misses required fields");
 					synchronized (output) {output.writeUTF(errorMsg.toJson());}
@@ -120,7 +129,8 @@ public class ServerMain extends Thread implements FileSystemObserver
 
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			log.info("Unable to communicate with " + clientHostPort.toString() + ", disconnected!");
+			close();
 		}
 	}
 }
