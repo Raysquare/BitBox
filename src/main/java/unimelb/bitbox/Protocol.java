@@ -35,9 +35,10 @@ public class Protocol {
             case "CONNECTION_REFUSED":
                 if (message.containsKey("message") && message.containsKey("peers")) {
                     for (Document peer : (ArrayList<Document>)message.get("peers")) {
-                        if (peer.containsKey("host") && peer.containsKey("port"))
-                            return true;
+                        if (!peer.containsKey("host") || !peer.containsKey("port"))
+                            return false;
                     }
+                    return true;
                 }
                 return false;
 
@@ -45,19 +46,16 @@ public class Protocol {
             case "HANDSHAKE_RESPONSE":
                 if (message.containsKey("hostPort")) {
                     Document hostPort = (Document)message.get("hostPort");
-                    if (hostPort.containsKey("host") && hostPort.containsKey("port"))
-                        return true;
+                    return hostPort.containsKey("host") && hostPort.containsKey("port");
                 }
                 return false;
 
             case "FILE_CREATE_REQUEST":
                 if (message.containsKey("pathName") && message.containsKey("fileDescriptor")) {
                     Document fileDescriptor = (Document)message.get("fileDescriptor");
-                    if (fileDescriptor.containsKey("md5") &&
-                        fileDescriptor.containsKey("lastModified") &&
-                        fileDescriptor.containsKey("fileSize"))
-
-                        return true;
+                    return fileDescriptor.containsKey("md5") &&
+                            fileDescriptor.containsKey("lastModified") &&
+                            fileDescriptor.containsKey("fileSize");
                 }
                 return false;
 
@@ -65,11 +63,9 @@ public class Protocol {
                 if (message.containsKey("pathName") && message.containsKey("fileDescriptor") &&
                     message.containsKey("message") && message.containsKey("status")) {
                     Document fileDescriptor = (Document)message.get("fileDescriptor");
-                    if (fileDescriptor.containsKey("md5") &&
+                    return fileDescriptor.containsKey("md5") &&
                             fileDescriptor.containsKey("lastModified") &&
-                            fileDescriptor.containsKey("fileSize"))
-
-                        return true;
+                            fileDescriptor.containsKey("fileSize");
                 }
                 return false;
 

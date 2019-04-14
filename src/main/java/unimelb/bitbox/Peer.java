@@ -20,10 +20,10 @@ public class Peer implements FileSystemObserver
     private String[] predefinedPeers;
 
     private HostPort localHost;
-    private ArrayList<ServerMain> connectedPeers;
+    private final ArrayList<ServerMain> connectedPeers;
     public FileSystemManager fileSystemManager;
 
-    private static Logger log = Logger.getLogger(Peer.class.getName());
+    private static final Logger log = Logger.getLogger(Peer.class.getName());
 
     public Peer() throws IOException, NoSuchAlgorithmException
     {

@@ -15,11 +15,11 @@ import java.util.logging.Logger;
 
 public class ServerMain extends Thread implements FileSystemObserver
 {
-	private static Logger log = Logger.getLogger(ServerMain.class.getName());
+	private static final Logger log = Logger.getLogger(ServerMain.class.getName());
 	private Peer localPeer;
 	private Socket socket;
-	private DataInputStream input;
-	private DataOutputStream output;
+	private final DataInputStream input;
+	private final DataOutputStream output;
 	private HostPort serverHostPort;
 	public HostPort clientHostPort;
 
@@ -38,6 +38,7 @@ public class ServerMain extends Thread implements FileSystemObserver
 
 	public void sendHandshakeRequest() throws IOException
 	{
+		log.info("Sent handshake request to " + clientHostPort.toString());
 		Document handshakeRequest = Protocol.createHandshakeRequest(serverHostPort);
 		output.writeUTF(handshakeRequest.toJson());
 	}
@@ -48,6 +49,7 @@ public class ServerMain extends Thread implements FileSystemObserver
 			try {
 				switch (fileSystemEvent.event) {
 					case FILE_CREATE:
+						log.info("A file create event has been received");
 						Document message = Protocol.createFileCreateRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
 						output.writeUTF(message.toJson());
 						break;
