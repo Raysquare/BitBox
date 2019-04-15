@@ -4,6 +4,8 @@ import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 import unimelb.bitbox.util.HostPort;
 
+import javax.print.Doc;
+import java.io.File;
 import java.util.ArrayList;
 
 public class Protocol {
@@ -69,7 +71,7 @@ public class Protocol {
                 }
                 return false;
 
-                //TODO: check the reset of the commands
+                //TODO: check the rest of the commands
         }
 
         return false; //delete this line after this method is implemented
@@ -94,7 +96,8 @@ public class Protocol {
         return JSON;
     }
 
-    public static Document createHandshakeRequest(HostPort host) {
+    public static Document createHandshakeRequest(HostPort host)
+    {
         Document JSON = new Document();
         JSON.append("command", "HANDSHAKE_REQUEST");
         JSON.append("hostPort", host.toDoc());
@@ -111,7 +114,8 @@ public class Protocol {
         return JSON;
     }
 
-    public static Document createFileCreateRequest(FileDescriptor fileDescriptor, String pathName) {
+    public static Document createFileCreateRequest(FileDescriptor fileDescriptor, String pathName)
+    {
         Document JSON = new Document();
 
         JSON.append("command", "FILE_CREATE_REQUEST");
@@ -121,7 +125,8 @@ public class Protocol {
         return JSON;
     }
 
-    public static Document createFileCreateResponse(FileDescriptor fileDescriptor, String pathName, String message, boolean status) {
+    public static Document createFileCreateResponse(FileDescriptor fileDescriptor, String pathName, String message, boolean status)
+    {
         Document JSON = new Document();
 
         JSON.append("command", "FILE_CREATE_RESPONSE");
@@ -133,5 +138,123 @@ public class Protocol {
         return JSON;
     }
 
-    //TODO: implementing the creation methods for the rest of commands
+    public static Document createFileBytesRequest(FileDescriptor fileDescriptor, String pathName, int position, int length){
+        Document JSON = new Document();
+
+        JSON.append("command", "FILE_BYTES_REQUEST");
+        JSON.append("fileDescriptor", fileDescriptor.toDoc());
+        JSON.append("pathName", pathName);
+        JSON.append("position", position);
+        JSON.append("length", length);
+
+        return JSON;
+    }
+
+    public static Document createFileBytesResponse(FileDescriptor fileDescriptor, String pathName, int position, int length, String content, String message, boolean status)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "FILE_BYTES_RESPONSE");
+        JSON.append("fileDescriptor", fileDescriptor.toDoc());
+        JSON.append("pathName", pathName);
+        JSON.append("position", position);
+        JSON.append("length", length);
+        JSON.append("content", content);
+        JSON.append("message", message);
+        JSON.append("status", status);
+
+        return JSON;
+    }
+
+    public static Document createFileDeleteRequest(FileDescriptor fileDescriptor, String pathName)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "FILE_DELETE_REQUEST");
+        JSON.append("fileDescriptor", fileDescriptor.toDoc());
+        JSON.append("pathName", pathName);
+
+        return JSON;
+    }
+
+    public static Document createFileDeleteResponse(FileDescriptor fileDescriptor, String pathName, String message, boolean status)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "FILE_DELETE_RESPONSE");
+        JSON.append("fileDescriptor", fileDescriptor.toDoc());
+        JSON.append("pathName", pathName);
+        JSON.append("message", message);
+        JSON.append("status", status);
+
+        return JSON;
+    }
+
+    public static Document createFileModifyRequest(FileDescriptor fileDescriptor, String pathName)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "FILE_MODIFY_REQUEST");
+        JSON.append("fileDescriptor", fileDescriptor.toDoc());
+        JSON.append("pathName", pathName);
+
+        return JSON;
+    }
+
+    public static Document createFileModifyResponse(FileDescriptor fileDescriptor, String pathName, String message, boolean status)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "FILE_MODIFY_RESPONSE");
+        JSON.append("fileDescriptor", fileDescriptor.toDoc());
+        JSON.append("pathName", pathName);
+        JSON.append("message", message);
+        JSON.append("status", status);
+
+        return JSON;
+    }
+
+    public static Document createDirectoryCreateRequest(String pathName)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "DIRECTORY_CREATE_REQUEST");
+        JSON.append("pathName", pathName);
+
+        return JSON;
+    }
+
+    public static Document createDirectoryCreateResponse(String pathName, String message, boolean status)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "DIRECTORY_CREATE_RESPONSE");
+        JSON.append("pathName", pathName);
+        JSON.append("message", message);
+        JSON.append("status", status);
+
+        return JSON;
+    }
+
+    public static Document createDirectoryDeleteRequest(String pathName)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "DIRECTORY_DELETE_REQUEST");
+        JSON.append("pathName", pathName);
+
+        return JSON;
+    }
+
+    public static Document createDirectoryDeleteResponse(String pathName, String message, boolean status)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "DIRECTORY_DELETE_RESPONSE");
+        JSON.append("pathName", pathName);
+        JSON.append("message", message);
+        JSON.append("status", status);
+
+        return JSON;
+    }
 }
