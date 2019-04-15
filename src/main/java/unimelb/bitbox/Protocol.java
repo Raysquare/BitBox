@@ -45,6 +45,12 @@ public class Protocol {
                 return false;
 
             case "HANDSHAKE_REQUEST":
+                if (message.containsKey("hostPort")) {
+                    Document hostPort = (Document)message.get("hostPort");
+                    return hostPort.containsKey("host") && hostPort.containsKey("port");
+                }
+                return false;
+
             case "HANDSHAKE_RESPONSE":
                 if (message.containsKey("hostPort")) {
                     Document hostPort = (Document)message.get("hostPort");
@@ -71,7 +77,81 @@ public class Protocol {
                 }
                 return false;
 
-                //TODO: check the rest of the commands
+            case "FILE_BYTES_REQUEST":
+                if (message.containsKey("pathName") && message.containsKey("fileDescriptor") &&
+                        message.containsKey("position") && message.containsKey("length")) {
+                    Document fileDescriptor = (Document)message.get("fileDescriptor");
+                    return fileDescriptor.containsKey("md5") &&
+                            fileDescriptor.containsKey("lastModified") &&
+                            fileDescriptor.containsKey("fileSize");
+                }
+                return false;
+
+            case "FILE_BYTES_RESPONSE":
+                if (message.containsKey("pathName") && message.containsKey("fileDescriptor") &&
+                        message.containsKey("position") && message.containsKey("length") &&
+                        message.containsKey("content") && message.containsKey("message") && message.containsKey("status"))
+                {
+                    Document fileDescriptor = (Document)message.get("fileDescriptor");
+                    return fileDescriptor.containsKey("md5") &&
+                            fileDescriptor.containsKey("lastModified") &&
+                            fileDescriptor.containsKey("fileSize");
+                }
+                return false;
+
+            case "FILE_DELETE_REQUEST":
+                if (message.containsKey("pathName") && message.containsKey("fileDescriptor"))
+                {
+                    Document fileDescriptor = (Document)message.get("fileDescriptor");
+                    return fileDescriptor.containsKey("md5") &&
+                            fileDescriptor.containsKey("lastModified") &&
+                            fileDescriptor.containsKey("fileSize");
+                }
+                return false;
+
+            case "FILE_DELETE_RESPONSE":
+                if (message.containsKey("pathName") && message.containsKey("fileDescriptor") &&
+                        message.containsKey("message") && message.containsKey("status"))
+                {
+                    Document fileDescriptor = (Document)message.get("fileDescriptor");
+                    return fileDescriptor.containsKey("md5") &&
+                            fileDescriptor.containsKey("lastModified") &&
+                            fileDescriptor.containsKey("fileSize");
+                }
+                return false;
+
+            case "FILE_MODIFY_REQUEST":
+                if (message.containsKey("pathName") && message.containsKey("fileDescriptor"))
+                {
+                    Document fileDescriptor = (Document)message.get("fileDescriptor");
+                    return fileDescriptor.containsKey("md5") &&
+                            fileDescriptor.containsKey("lastModified") &&
+                            fileDescriptor.containsKey("fileSize");
+                }
+                return false;
+
+            case "FILE_MODIFY_RESPONSE":
+                if (message.containsKey("pathName") && message.containsKey("fileDescriptor") &&
+                        message.containsKey("message") && message.containsKey("status"))
+                {
+                    Document fileDescriptor = (Document)message.get("fileDescriptor");
+                    return fileDescriptor.containsKey("md5") &&
+                            fileDescriptor.containsKey("lastModified") &&
+                            fileDescriptor.containsKey("fileSize");
+                }
+                return false;
+
+            case "DIRECTORY_CREATE_REQUEST":
+                return message.containsKey("pathName");
+
+            case "DIRECTORY_CREATE_RESPONSE":
+                return (message.containsKey("pathName") && message.containsKey("message") && message.containsKey("status"));
+
+            case "DIRECTORY_DELETE_REQUEST":
+                return message.containsKey("pathName");
+
+            case "DIRECTORY_DELETE_RESPONSE":
+                return (message.containsKey("pathName") && message.containsKey("message") && message.containsKey("status"));
         }
 
         return false; //delete this line after this method is implemented
