@@ -9,25 +9,6 @@ import java.io.File;
 import java.util.ArrayList;
 
 public class Protocol {
-    public static enum Command {
-        INVALID_PROTOCOL,
-        CONNECTION_REFUSED,
-        HANDSHAKE_REQUEST,
-        HANDSHAKE_RESPONSE,
-        FILE_CREATE_REQUEST,
-        FILE_CREATE_RESPONSE,
-        FILE_DELETE_REQUEST,
-        FILE_DELETE_RESPONSE,
-        FILE_MODIFY_REQUEST,
-        FILE_MODIFY_RESPONSE,
-        DIRECTORY_CREATE_REQUEST,
-        DIRECTORY_CREATE_RESPONSE,
-        DIRECTORY_DELETE_REQUEST,
-        DIRECTORY_DELETE_RESPONSE,
-        FILE_BYTES_REQUEST,
-        FILE_BYTES_RESPONSE
-    }
-
     public static boolean isValid(Document message)
     {
         switch (message.getString("command")) {
@@ -45,12 +26,6 @@ public class Protocol {
                 return false;
 
             case "HANDSHAKE_REQUEST":
-                if (message.containsKey("hostPort")) {
-                    Document hostPort = (Document)message.get("hostPort");
-                    return hostPort.containsKey("host") && hostPort.containsKey("port");
-                }
-                return false;
-
             case "HANDSHAKE_RESPONSE":
                 if (message.containsKey("hostPort")) {
                     Document hostPort = (Document)message.get("hostPort");
@@ -100,26 +75,6 @@ public class Protocol {
                 return false;
 
             case "FILE_DELETE_REQUEST":
-                if (message.containsKey("pathName") && message.containsKey("fileDescriptor"))
-                {
-                    Document fileDescriptor = (Document)message.get("fileDescriptor");
-                    return fileDescriptor.containsKey("md5") &&
-                            fileDescriptor.containsKey("lastModified") &&
-                            fileDescriptor.containsKey("fileSize");
-                }
-                return false;
-
-            case "FILE_DELETE_RESPONSE":
-                if (message.containsKey("pathName") && message.containsKey("fileDescriptor") &&
-                        message.containsKey("message") && message.containsKey("status"))
-                {
-                    Document fileDescriptor = (Document)message.get("fileDescriptor");
-                    return fileDescriptor.containsKey("md5") &&
-                            fileDescriptor.containsKey("lastModified") &&
-                            fileDescriptor.containsKey("fileSize");
-                }
-                return false;
-
             case "FILE_MODIFY_REQUEST":
                 if (message.containsKey("pathName") && message.containsKey("fileDescriptor"))
                 {
@@ -130,6 +85,7 @@ public class Protocol {
                 }
                 return false;
 
+            case "FILE_DELETE_RESPONSE":
             case "FILE_MODIFY_RESPONSE":
                 if (message.containsKey("pathName") && message.containsKey("fileDescriptor") &&
                         message.containsKey("message") && message.containsKey("status"))
@@ -142,24 +98,21 @@ public class Protocol {
                 return false;
 
             case "DIRECTORY_CREATE_REQUEST":
-                return message.containsKey("pathName");
-
-            case "DIRECTORY_CREATE_RESPONSE":
-                return (message.containsKey("pathName") && message.containsKey("message") && message.containsKey("status"));
-
             case "DIRECTORY_DELETE_REQUEST":
                 return message.containsKey("pathName");
 
+            case "DIRECTORY_CREATE_RESPONSE":
             case "DIRECTORY_DELETE_RESPONSE":
                 return (message.containsKey("pathName") && message.containsKey("message") && message.containsKey("status"));
         }
 
-        return false; //delete this line after this method is implemented
+        return false;
     }
 
     public static Document createInvalidProtocol(String message)
     {
         Document JSON = new Document();
+
         JSON.append("command", "INVALID_PROTOCOL");
         JSON.append("message", message);
 
@@ -169,6 +122,7 @@ public class Protocol {
     public static Document createConnectionRefused(String message, ArrayList<Document> peers)
     {
         Document JSON = new Document();
+
         JSON.append("command", "CONNECTION_REFUSED");
         JSON.append("message", message);
         JSON.append("peers", peers);
@@ -179,6 +133,7 @@ public class Protocol {
     public static Document createHandshakeRequest(HostPort host)
     {
         Document JSON = new Document();
+
         JSON.append("command", "HANDSHAKE_REQUEST");
         JSON.append("hostPort", host.toDoc());
 
@@ -188,6 +143,7 @@ public class Protocol {
     public static Document createHandshakeResponse(HostPort host)
     {
         Document JSON = new Document();
+
         JSON.append("command", "HANDSHAKE_RESPONSE");
         JSON.append("hostPort", host.toDoc());
 

@@ -9,12 +9,13 @@ import unimelb.bitbox.util.HostPort;
 import java.io.*;
 import java.net.Socket;
 import java.nio.Buffer;
+import java.nio.charset.StandardCharsets;
 import java.util.logging.Logger;
 
 
-public class ServerMain extends Thread implements FileSystemObserver
+public class ServerThread extends Thread implements FileSystemObserver
 {
-	private static final Logger log = Logger.getLogger(ServerMain.class.getName());
+	private static final Logger log = Logger.getLogger(ServerThread.class.getName());
 	private Peer localPeer;
 	private Socket socket;
 	private final BufferedReader input;
@@ -24,7 +25,7 @@ public class ServerMain extends Thread implements FileSystemObserver
 
 	private boolean isFirstTime;
 	
-	public ServerMain(Peer localPeer, Socket socket, HostPort serverHostPort, HostPort clientHostPort) throws IOException
+	public ServerThread(Peer localPeer, Socket socket, HostPort serverHostPort, HostPort clientHostPort) throws IOException
 	{
 		isFirstTime = true;
 		this.socket = socket;
@@ -58,21 +59,20 @@ public class ServerMain extends Thread implements FileSystemObserver
 					log.info(message.toJson());
 					break;
 
-				//TODO: handle the rest of file system event
 				case FILE_DELETE:
-					message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor,fileSystemEvent.pathName);
+					message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
 					synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
 
-					log.info("A file delete event has been received");
+					log.info("[LocalPeer] A file delete event was received");
 					log.info("[LocalPeer] Sent FILE_DELETE_REQUEST to " + clientHostPort.toString());
 					log.info(message.toJson());
 					break;
 
 				case FILE_MODIFY:
-					message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor,fileSystemEvent.pathName);
+					message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
 					synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
 
-					log.info("A file modify event has been received");
+					log.info("[LocalPeer] A file modify event has been received");
 					log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
 					log.info(message.toJson());
 					break;
@@ -81,7 +81,7 @@ public class ServerMain extends Thread implements FileSystemObserver
 					message = Protocol.createDirectoryCreateRequest(fileSystemEvent.pathName);
 					synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
 
-					log.info("A directory create event has been received");
+					log.info("[LocalPeer] A directory create event has been received");
 					log.info("[LocalPeer] Sent DIRECTORY_CREATE_REQUEST to " + clientHostPort.toString());
 					log.info(message.toJson());
 					break;
@@ -90,7 +90,7 @@ public class ServerMain extends Thread implements FileSystemObserver
 					message = Protocol.createDirectoryDeleteRequest(fileSystemEvent.pathName);
 					synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
 
-					log.info("A directory delete event has been received");
+					log.info("[LocalPeer] A directory delete event has been received");
 					log.info("[LocalPeer] Sent DIRECTORY_DELETE_REQUEST to " + clientHostPort.toString());
 					log.info(message.toJson());
 					break;
@@ -127,7 +127,6 @@ public class ServerMain extends Thread implements FileSystemObserver
 				Document JSON = Document.parse(input.readLine());
 				//log.info(JSON.toJson());
 
-				/* Uncomment this when 'isValid()' is fully implemented
 				if (!Protocol.isValid(JSON)) {
 					Document errorMsg = Protocol.createInvalidProtocol("Invalid protocol: the message misses required fields");
 					synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
@@ -137,7 +136,6 @@ public class ServerMain extends Thread implements FileSystemObserver
 					log.info(errorMsg.toJson());
 					break;
 				}
-				 */
 
 				switch (JSON.getString("command")) {
 					case "HANDSHAKE_REQUEST":

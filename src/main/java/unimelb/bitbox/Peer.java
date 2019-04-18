@@ -17,10 +17,10 @@ import java.util.logging.Logger;
 public class Peer implements FileSystemObserver
 {
     private int maxConnections;
-    private String[] predefinedPeers;
+    private String[] initialPeers;
 
     private HostPort localHost;
-    private final ArrayList<ServerMain> connectedPeers;
+    private final ArrayList<ServerThread> connectedPeers;
     public FileSystemManager fileSystemManager;
 
     private static final Logger log = Logger.getLogger(Peer.class.getName());
@@ -29,9 +29,9 @@ public class Peer implements FileSystemObserver
     {
         fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
 
-        predefinedPeers = Configuration.getConfigurationValue("peers").split(",");
-        maxConnections = Integer.parseInt(predefinedPeers.length + Configuration.getConfigurationValue("maximumIncommingConnections"));
-        connectedPeers = new ArrayList<ServerMain>(maxConnections);
+        initialPeers = Configuration.getConfigurationValue("peers").split(",");
+        maxConnections = Integer.parseInt(initialPeers.length + Configuration.getConfigurationValue("maximumIncommingConnections"));
+        connectedPeers = new ArrayList<ServerThread>(maxConnections);
 
         InetAddress hostAddress = InetAddress.getLocalHost();
         localHost = new HostPort(hostAddress.getHostAddress(), Integer.parseInt(Configuration.getConfigurationValue("port")));
@@ -41,9 +41,9 @@ public class Peer implements FileSystemObserver
         Connect to the peers in the configuration file, send handshake request,
         and add them into 'connectedPeers'
      */
-    private void connectPredefinedPeers()
+    private void connectInitialPeers()
     {
-        for (String peer : predefinedPeers) {
+        for (String peer : initialPeers) {
             String[] address = peer.split(":");
             String ip = address[0];
             int port = Integer.parseInt(address[1]);
@@ -54,7 +54,7 @@ public class Peer implements FileSystemObserver
                 int clientPort = socket.getPort();
                 log.info("[LocalPeer] Connected to " + peer);
 
-                ServerMain serverThread = new ServerMain(this, socket, localHost, new HostPort(clientAddress, clientPort));
+                ServerThread serverThread = new ServerThread(this, socket, localHost, new HostPort(clientAddress, clientPort));
                 serverThread.sendHandshakeRequest();
                 serverThread.start(); // start the thread
                 connectedPeers.add(serverThread);
@@ -86,7 +86,7 @@ public class Peer implements FileSystemObserver
      */
     public void start() throws IOException
     {
-        connectPredefinedPeers();
+        connectInitialPeers();
         setTimerForGenerateSyncEvents();
         ServerSocketFactory factory = ServerSocketFactory.getDefault();
         ServerSocket server = factory.createServerSocket(localHost.port);
@@ -97,7 +97,7 @@ public class Peer implements FileSystemObserver
             // create a new thread and put it into 'connectedPeer' after getting a connection
             String clientAddress = socket.getInetAddress().getHostAddress();
             int clientPort = socket.getPort();
-            ServerMain serverThread = new ServerMain(this, socket, localHost, new HostPort(clientAddress, clientPort));
+            ServerThread serverThread = new ServerThread(this, socket, localHost, new HostPort(clientAddress, clientPort));
             serverThread.start();
             connectedPeers.add(serverThread);
         }
@@ -114,7 +114,7 @@ public class Peer implements FileSystemObserver
         This method will be called by 'ServerMain' objects if receiving an invalid protocol or a handshake
         request after handshake has been completed
      */
-    public void removeFromConnectedPeers(ServerMain obj)
+    public void removeFromConnectedPeers(ServerThread obj)
     {
         synchronized (connectedPeers) {
             connectedPeers.remove(obj);
@@ -130,7 +130,7 @@ public class Peer implements FileSystemObserver
         synchronized (connectedPeers) {
             ArrayList<Document> hostPorts = new ArrayList<Document>(connectedPeers.size());
 
-            for (ServerMain peer : connectedPeers)
+            for (ServerThread peer : connectedPeers)
                 hostPorts.add(peer.clientHostPort.toDoc());
 
 
@@ -148,7 +148,7 @@ public class Peer implements FileSystemObserver
     public void processFileSystemEvent(FileSystemEvent fileSystemEvent)
     {
         synchronized (connectedPeers) {
-            for (ServerMain peer : connectedPeers)
+            for (ServerThread peer : connectedPeers)
                 peer.processFileSystemEvent(fileSystemEvent);
         }
     }
