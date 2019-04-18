@@ -59,6 +59,41 @@ public class ServerMain extends Thread implements FileSystemObserver
 					break;
 
 				//TODO: handle the rest of file system event
+				case FILE_DELETE:
+					message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor,fileSystemEvent.pathName);
+					synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
+
+					log.info("A file delete event has been received");
+					log.info("[LocalPeer] Sent FILE_DELETE_REQUEST to " + clientHostPort.toString());
+					log.info(message.toJson());
+					break;
+
+				case FILE_MODIFY:
+					message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor,fileSystemEvent.pathName);
+					synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
+
+					log.info("A file modify event has been received");
+					log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
+					log.info(message.toJson());
+					break;
+
+				case DIRECTORY_CREATE:
+					message = Protocol.createDirectoryCreateRequest(fileSystemEvent.pathName);
+					synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
+
+					log.info("A directory create event has been received");
+					log.info("[LocalPeer] Sent DIRECTORY_CREATE_REQUEST to " + clientHostPort.toString());
+					log.info(message.toJson());
+					break;
+
+				case DIRECTORY_DELETE:
+					message = Protocol.createDirectoryDeleteRequest(fileSystemEvent.pathName);
+					synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
+
+					log.info("A directory delete event has been received");
+					log.info("[LocalPeer] Sent DIRECTORY_DELETE_REQUEST to " + clientHostPort.toString());
+					log.info(message.toJson());
+					break;
 			}
 
 		} catch (IOException e) {
