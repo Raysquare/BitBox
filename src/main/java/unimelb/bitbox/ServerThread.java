@@ -127,7 +127,8 @@ public class ServerThread extends Thread implements FileSystemObserver
 
 		try {
 			while (true) {
-				Document JSON = Document.parse(input.readLine());
+
+                Document JSON = Document.parse(input.readLine());
 				//log.info(JSON.toJson());
 
 				if (!Protocol.isValid(JSON)) {
@@ -185,12 +186,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A file create request was recived from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
-                        Document fileDescri =(Document) JSON.get("fileDescriptor");
-
-                        long lastModified = fileDescri.getLong("lastModified");
-                        long fileSize = fileDescri.getLong("fileSize");
-                        String md5 = fileDescri.getString("md5");
-                        FileSystemManager.FileDescriptor file = fileSystemManager.new FileDescriptor(lastModified,md5,fileSize);
+                        FileSystemManager.FileDescriptor file = Protocol.createFileDesctiptorFromDocument(fileSystemManager,JSON);
 
                         if(!fileSystemManager.isSafePathName(pathName)){
                             String errorString = "Path name is unsafe: File create request failed";
@@ -200,7 +196,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                             log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
                             log.info(errorMsg.toJson());
-                            return;
+                            break;
                         }
 
                         if(fileSystemManager.fileNameExists(pathName)){
@@ -211,10 +207,10 @@ public class ServerThread extends Thread implements FileSystemObserver
                             log.info("[LocalPeer] File name has existed, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
                             log.info(errorMsg.toJson());
-                            return;
+                            break;
                         }
 
-                        String messageString = "file loader ready";
+                        String messageString = "File loader ready";
                         Document fileCreateMessage = Protocol.createFileCreateResponse(file,pathName,messageString,true);
                         synchronized (output) {output.write(fileCreateMessage.toJson()); output.newLine(); output.flush();}
 
@@ -224,6 +220,11 @@ public class ServerThread extends Thread implements FileSystemObserver
 
 
                         break;
+
+                    case"FILE_CREATE_RESPONSE":
+                        log.info("[LocalPeer] A file create response was recived from " + clientHostPort.toString());
+                        break;
+
 
 
 				}
