@@ -404,7 +404,7 @@ public class ServerThread extends Thread implements FileSystemObserver
 						}
 
 						messageString = "Directory loader ready";
-						Document fileBytesMessage = Protocol.createFileBytesResponse(file, pathName, position, length, content, messageString,true);
+						Document fileBytesMessage = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, messageString,true);
 						synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
 						break;
 
