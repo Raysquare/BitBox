@@ -1,18 +1,19 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.util.Document;
+import sun.misc.BASE64Decoder;
+import sun.misc.BASE64Encoder;
+import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.Document.*;
-import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
-import unimelb.bitbox.util.FileSystemObserver;
-import unimelb.bitbox.util.HostPort;
 
 import javax.print.Doc;
 import java.io.*;
 import java.net.Socket;
 import java.nio.Buffer;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
 import java.util.logging.Logger;
 
 
@@ -212,17 +213,76 @@ public class ServerThread extends Thread implements FileSystemObserver
                             break;
                         }
 
-                        String messageString = "File loader ready";
-                        Document fileCreateMessage = Protocol.createFileCreateResponse(file,pathName,messageString,true);
-                        synchronized (output) {output.write(fileCreateMessage.toJson()); output.newLine(); output.flush();}
+						fileSystemManager.createFileLoader(pathName,JSON.getString("md5"),JSON.getLong("length"),JSON.getLong("lastModified"));
+						String messageString = "File loader ready";
+						Document fileCreateMessage = Protocol.createFileCreateResponse(file, pathName, messageString, true);
+						synchronized (output) {
+							output.write(fileCreateMessage.toJson());
+							output.newLine();
+							output.flush();
+						}
 
-                        log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
-                        log.info(fileCreateMessage.toJson());
+						log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
+						log.info(fileCreateMessage.toJson());
 
-                        break;
+						if(fileSystemManager.checkShortcut(pathName))
+						{
+							log.info("[LocalPeer] have file with same content" );
+							break;
+						}
+
+						Document fileByteMessage = Protocol.createFileBytesRequest(file,pathName,JSON.getInteger("position"),JSON.getInteger("length"));
+						synchronized (output) {output.write(fileByteMessage.toJson()); output.newLine(); output.flush();}
+						log.info("[LocalPeer] A file create  request was received from " + clientHostPort.toString());
+						log.info("[LocalPeer] Sent FILE_BYTES_REQUEST to " + clientHostPort.toString());
+						log.info((fileByteMessage.toJson()));
+
+						break;
+
 
 					case "FILE_CREATE_RESPONSE":
 						log.info("[LocalPeer] A file create response was received from " + clientHostPort.toString());
+						break;
+
+					case "FILE_BYTES_REQUEST":
+
+						if (JSON.getLong("length") <= Long.parseLong(Configuration.getConfigurationValue("blockSize")))
+						{
+                            pathName = JSON.getString("pathName");
+                            file = Protocol.createFileDesctiptorFromDocument(fileSystemManager,JSON);
+							String encode= new BASE64Encoder().encode(fileSystemManager.readFile(JSON.getString("md5"),JSON.getLong("position"),JSON.getLong("length")));
+							fileSystemManager.readFile(JSON.getString("md5"),JSON.getLong("position"),JSON.getLong("length"));
+							Document fileBytesMessage = Protocol.createFileBytesResponse(file,pathName,JSON.getInteger("position"),JSON.getInteger("length"),encode,"successful read",true);
+							synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
+							log.info("[LocalPeer] A file bytes request was received from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE success to " + clientHostPort.toString());
+							log.info((fileBytesMessage.toJson()));
+						}else
+						{
+                            pathName = JSON.getString("pathName");
+                            file = Protocol.createFileDesctiptorFromDocument(fileSystemManager,JSON);
+							Document errorMsg = Protocol.createFileBytesResponse(file,pathName,JSON.getInteger("position"),JSON.getInteger("length"),"","unsuccessful read",false);
+							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+							log.info("[LocalPeer] A unreasonable file bytes request was received from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE failed to " + clientHostPort.toString());
+							log.info((errorMsg.toJson()));
+						}
+						break;
+
+					case"FILE_BYTES_RESPONSE":
+                        pathName = JSON.getString("pathName");
+                        file = Protocol.createFileDesctiptorFromDocument(fileSystemManager,JSON);
+						byte[] bytes = new BASE64Decoder().decodeBuffer(JSON.getString("content"));
+						ByteBuffer buf = ByteBuffer.wrap(bytes);
+						fileSystemManager.writeFile(pathName,buf,JSON.getLong("position"));
+						if(!fileSystemManager.checkWriteComplete(pathName))
+						{
+							fileByteMessage = Protocol.createFileBytesRequest(file,pathName,JSON.getInteger("position"),JSON.getInteger("length"));
+							synchronized (output) {output.write(fileByteMessage.toJson()); output.newLine(); output.flush();}
+							log.info("[LocalPeer] A file bytes response was received from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent FILE_BYTES_REQUEST to " + clientHostPort.toString());
+							log.info((fileByteMessage.toJson()));
+						}
 						break;
 
 					case"FILE_DELETE_REQUEST":
@@ -373,50 +433,14 @@ public class ServerThread extends Thread implements FileSystemObserver
 						log.info("[LocalPeer] A directory delete response was received from " + clientHostPort.toString());
 						break;
 
-					case"FILE_BYTES_REQUEST":
-						log.info("[LocalPeer] A file bytes request was received from " + clientHostPort.toString());
-						pathName = JSON.getString("pathName");
-						int position = JSON.getInteger("position");
-						int length = JSON.getInteger("length");
-						String content = JSON.getString("content");
-						FileDescriptor fileDescriptor = (FileDescriptor) JSON.get("fileDescriptor");
-
-						if(!fileSystemManager.isSafePathName(pathName)){
-							String errorString = "Path name is unsafe: File bytes request failed";
-							Document errorMsg = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, errorString, false);
-							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
-
-							log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
-							log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE to " + clientHostPort.toString());
-							log.info(errorMsg.toJson());
-							break;
-						}
-
-						if(fileSystemManager.fileNameExists(pathName)){
-							String errorString = "File name has existed: File bytes request failed";
-							Document errorMsg = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, errorString, false);
-							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
-
-							log.info("[LocalPeer] File name has existed, refused request from " + clientHostPort.toString());
-							log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE to " + clientHostPort.toString());
-							log.info(errorMsg.toJson());
-							break;
-						}
-
-						messageString = "Directory loader ready";
-						Document fileBytesMessage = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, messageString,true);
-						synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
-						break;
-
-					case"FILE_BYTES_RESPONSE":
-						log.info("[LocalPeer] A file bytes response was received from " + clientHostPort.toString());
-						break;
 				}
 
 			}
 		} catch (IOException e) {
 			log.info("[LocalPeer] Unable to communicate with " + clientHostPort.toString() + ", disconnected!");
-		} finally {
+		} catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } finally {
 			close();
 		}
 	}
