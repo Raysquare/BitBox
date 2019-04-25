@@ -306,7 +306,33 @@ public class ServerThread extends Thread implements FileSystemObserver
 
 					case"DIRECTORY_CREATE_REQUEST":
 						log.info("[LocalPeer] A directory create request was received from " + clientHostPort.toString());
-						//TODO: handle this protocol command
+						pathName = JSON.getString("pathName");
+						if(!fileSystemManager.isSafePathName(pathName)){
+							String errorString = "Path name is unsafe: Directory create request failed";
+							Document errorMsg = Protocol.createDirectoryCreateResponse(pathName, errorString, false);
+							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+
+							log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent DIRECTORY_CREATE_RESPONSE to " + clientHostPort.toString());
+							log.info(errorMsg.toJson());
+							break;
+						}
+
+						if(fileSystemManager.dirNameExists(pathName)){
+							String errorString = "Directory name has existed: Directory create request failed";
+							Document errorMsg = Protocol.createDirectoryCreateResponse(pathName,errorString,false);
+							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+
+							log.info("[LocalPeer] Directory name has existed, refused request from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent DIRECTORY_CREATE_RESPONSE to " + clientHostPort.toString());
+							log.info(errorMsg.toJson());
+							break;
+						}
+
+						messageString = "Directory loader ready";
+						Document directoryCreateMessage = Protocol.createDirectoryCreateResponse(pathName,messageString,true);
+						synchronized (output) {output.write(directoryCreateMessage.toJson()); output.newLine(); output.flush();}
+
 						break;
 
 					case"DIRECTORY_CREATE_RESPONSE":
@@ -315,20 +341,75 @@ public class ServerThread extends Thread implements FileSystemObserver
 
 					case"DIRECTORY_DELETE_REQUEST":
 						log.info("[LocalPeer] A directory delete request was received from " + clientHostPort.toString());
-						//TODO: handle this protocol command
+						pathName = JSON.getString("pathName");
+						if(!fileSystemManager.isSafePathName(pathName)){
+							String errorString = "Path name is unsafe: Directory delete request failed";
+							Document errorMsg = Protocol.createDirectoryDeleteResponse(pathName, errorString, false);
+							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+
+							log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent DIRECTORY_DELETE_RESPONSE to " + clientHostPort.toString());
+							log.info(errorMsg.toJson());
+							break;
+						}
+
+						if(fileSystemManager.dirNameExists(pathName)){
+							String errorString = "Directory name has existed: Directory delete request failed";
+							Document errorMsg = Protocol.createDirectoryDeleteResponse(pathName,errorString,false);
+							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+
+							log.info("[LocalPeer] Directory name has existed, refused request from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent DIRECTORY_DELETE_RESPONSE to " + clientHostPort.toString());
+							log.info(errorMsg.toJson());
+							break;
+						}
+
+						messageString = "Directory loader ready";
+						Document directoryDeleteMessage = Protocol.createDirectoryDeleteResponse(pathName,messageString,true);
+						synchronized (output) {output.write(directoryDeleteMessage.toJson()); output.newLine(); output.flush();}
 						break;
 
 					case"DIRECTORY_DELETE_RESPONSE":
-						log.info("[LocalPeer] A directory delete request was received from " + clientHostPort.toString());
+						log.info("[LocalPeer] A directory delete response was received from " + clientHostPort.toString());
 						break;
 
 					case"FILE_BYTES_REQUEST":
-						log.info("[LocalPeer] A directory delete request was received from " + clientHostPort.toString());
-						//TODO: handle this protocol command
+						log.info("[LocalPeer] A file bytes request was received from " + clientHostPort.toString());
+						pathName = JSON.getString("pathName");
+						int position = JSON.getInteger("position");
+						int length = JSON.getInteger("length");
+						String content = JSON.getString("content");
+						FileDescriptor fileDescriptor = (FileDescriptor) JSON.get("fileDescriptor");
+
+						if(!fileSystemManager.isSafePathName(pathName)){
+							String errorString = "Path name is unsafe: File bytes request failed";
+							Document errorMsg = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, errorString, false);
+							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+
+							log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE to " + clientHostPort.toString());
+							log.info(errorMsg.toJson());
+							break;
+						}
+
+						if(fileSystemManager.fileNameExists(pathName)){
+							String errorString = "File name has existed: File bytes request failed";
+							Document errorMsg = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, errorString, false);
+							synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+
+							log.info("[LocalPeer] File name has existed, refused request from " + clientHostPort.toString());
+							log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE to " + clientHostPort.toString());
+							log.info(errorMsg.toJson());
+							break;
+						}
+
+						messageString = "Directory loader ready";
+						Document fileBytesMessage = Protocol.createFileBytesResponse(file, pathName, position, length, content, messageString,true);
+						synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
 						break;
 
 					case"FILE_BYTES_RESPONSE":
-						log.info("[LocalPeer] A directory delete request was received from " + clientHostPort.toString());
+						log.info("[LocalPeer] A file bytes response was received from " + clientHostPort.toString());
 						break;
 				}
 
