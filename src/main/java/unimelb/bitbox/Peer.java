@@ -130,16 +130,17 @@ public class Peer implements FileSystemObserver
 
     /*
         This method will be called if the maximum connections has been reached. It returns the host and port of
-        all the connected peers
+        all the connected peers except the hostPort in the parameter
      */
-    public ArrayList<Document> getConnectedPeerHostPort()
+    public ArrayList<Document> getConnectedPeerHostPort(HostPort hostPort)
     {
         synchronized (connectedPeers) {
             ArrayList<Document> hostPorts = new ArrayList<Document>(connectedPeers.size());
 
-            for (ServerThread peer : connectedPeers)
-                hostPorts.add(peer.clientHostPort.toDoc());
-
+            for (ServerThread peer : connectedPeers) {
+                if (!peer.clientHostPort.equals(hostPort))
+                    hostPorts.add(peer.clientHostPort.toDoc());
+            }
 
             return hostPorts;
         }

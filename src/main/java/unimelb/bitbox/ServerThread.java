@@ -10,8 +10,11 @@ import unimelb.bitbox.util.HostPort;
 import java.io.*;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedList;
 import java.util.logging.Logger;
 
 
@@ -20,30 +23,36 @@ public class ServerThread extends Thread implements FileSystemObserver
     private static final Logger log = Logger.getLogger(ServerThread.class.getName());
     private Peer localPeer;
     private Socket socket;
-    private final BufferedReader input;
-    private final BufferedWriter output;
+    private BufferedReader input;
+    private BufferedWriter output;
     private HostPort serverHostPort;
     public HostPort clientHostPort;
 
-    private boolean isFirstTime;
+    private boolean handshakeCompleted;
+    private LinkedList<HostPort> peerCandidates;
 
     public ServerThread(Peer localPeer, Socket socket, HostPort serverHostPort, HostPort clientHostPort) throws IOException
     {
-        isFirstTime = true;
+        handshakeCompleted = false;
         this.socket = socket;
         this.localPeer = localPeer;
         this.serverHostPort = serverHostPort;
         this.clientHostPort = clientHostPort;
-        input = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF8"));
-        output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF8"));
+
+        input = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+        output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
+
+        peerCandidates = new LinkedList<HostPort>();
     }
 
     public void sendHandshakeRequest() throws IOException
     {
         Document handshakeRequest = Protocol.createHandshakeRequest(serverHostPort);
+
         output.write(handshakeRequest.toJson());
         output.newLine();
         output.flush();
+
         log.info("[LocalPeer] Sent a handshake request to " + clientHostPort.toString());
         log.info(handshakeRequest.toJson());
     }
@@ -52,17 +61,22 @@ public class ServerThread extends Thread implements FileSystemObserver
     {
         long length = Math.min(localPeer.blockSize, fileDescriptor.fileSize);
         Document fileByteMessage = Protocol.createFileBytesRequest(fileDescriptor, pathName, 0, length);
+
         synchronized (output) {
             output.write(fileByteMessage.toJson());
             output.newLine();
             output.flush();
         }
+
         log.info("[LocalPeer] Sent FILE_BYTES_REQUEST to " + clientHostPort.toString());
         log.info((fileByteMessage.toJson()));
     }
 
     public void processFileSystemEvent(FileSystemEvent fileSystemEvent)
     {
+        if (!handshakeCompleted)
+            return;
+
         try {
             switch (fileSystemEvent.event) {
                 case FILE_CREATE:
@@ -110,7 +124,6 @@ public class ServerThread extends Thread implements FileSystemObserver
                     log.info(message.toJson());
                     break;
             }
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -125,8 +138,6 @@ public class ServerThread extends Thread implements FileSystemObserver
 
         } catch (IOException e) {
             log.info("[LocalPeer] Unable to close the socket connecting to " + clientHostPort.toString());
-        } finally {
-            localPeer.removeFromConnectedPeers(this);
         }
     }
 
@@ -139,7 +150,6 @@ public class ServerThread extends Thread implements FileSystemObserver
 
         try {
             while (true) {
-
                 Document JSON = Document.parse(input.readLine());
                 //log.info(JSON.toJson());
 
@@ -155,7 +165,7 @@ public class ServerThread extends Thread implements FileSystemObserver
 
                 switch (JSON.getString("command")) {
                     case "HANDSHAKE_REQUEST": {
-                        if (!isFirstTime) {
+                        if (handshakeCompleted) {
                             Document errorMsg = Protocol.createInvalidProtocol("Invalid protocol: handshake has been completed");
                             synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
 
@@ -166,7 +176,8 @@ public class ServerThread extends Thread implements FileSystemObserver
                         }
 
                         if (localPeer.hasReachedMaxConnections()) {
-                            Document errorMsg = Protocol.createConnectionRefused("The maximum connections has been reached", localPeer.getConnectedPeerHostPort());
+                            String errorString = "The maximum connections has been reached";
+                            Document errorMsg = Protocol.createConnectionRefused(errorString, localPeer.getConnectedPeerHostPort(clientHostPort));
                             synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
 
                             log.info("[LocalPeer] The maximum connections were reached, disconnected from " + clientHostPort.toString());
@@ -177,7 +188,7 @@ public class ServerThread extends Thread implements FileSystemObserver
 
                         Document message = Protocol.createHandshakeResponse(serverHostPort);
                         synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
-                        isFirstTime = false;
+                        handshakeCompleted = true;
 
                         log.info("[LocalPeer] A handshake request was received from " + clientHostPort.toString());
                         log.info("[LocalPeer] Sent HANDSHAKE_RESPONSE to " + clientHostPort.toString());
@@ -185,17 +196,48 @@ public class ServerThread extends Thread implements FileSystemObserver
                         break;
                     }
 
-                    case "HANDSHAKE_RESPONSE":
+                    case "HANDSHAKE_RESPONSE": {
                         log.info("[LocalPeer] A handshake response was received from " + clientHostPort.toString());
+                        handshakeCompleted = true;
+                        peerCandidates.clear();
                         break;
+                    }
 
-                    case "CONNECTION_REFUSED":
+                    case "CONNECTION_REFUSED": {
                         log.info("[LocalPeer] A connection refused message was received from " + clientHostPort.toString());
-                        return;
-                        //TODO: this command hasn't been processed
-                        //break;
+
+                        for (Document peer : (ArrayList<Document>)JSON.get("peers")) {
+                            HostPort peerHostPort = new HostPort(peer.getString("host"), (int) peer.getLong("port"));
+                            peerCandidates.add(peerHostPort);
+                        }
+
+                        if (peerCandidates.isEmpty())
+                            return;
+
+                        clientHostPort = peerCandidates.poll();
+
+                        try {
+                            log.info("[LocalPeer] Trying to connect to " + clientHostPort.toString());
+                            Socket newSocket = new Socket(clientHostPort.host, clientHostPort.port);
+                            close();
+
+                            input = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StandardCharsets.UTF_8));
+                            output = new BufferedWriter(new OutputStreamWriter(newSocket.getOutputStream(), StandardCharsets.UTF_8));
+                            socket = newSocket;
+
+                            sendHandshakeRequest();
+
+                        } catch (IOException e) {
+                            log.info("[LocalPeer] Failed to connect to " + clientHostPort.toString());
+                        }
+
+                        break;
+                    }
 
                     case "FILE_CREATE_REQUEST": {
+                        if (!handshakeCompleted)
+                            break;
+
                         log.info("[LocalPeer] A file create request was received from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
@@ -283,6 +325,9 @@ public class ServerThread extends Thread implements FileSystemObserver
                     }
 
                     case "FILE_BYTES_REQUEST": {
+                        if (!handshakeCompleted)
+                            break;
+
                         String pathName = JSON.getString("pathName");
                         long position = JSON.getLong("position");
                         long length = JSON.getLong("length");
@@ -330,6 +375,9 @@ public class ServerThread extends Thread implements FileSystemObserver
                     }
 
                     case"FILE_DELETE_REQUEST": {
+                        if (!handshakeCompleted)
+                            break;
+
                         log.info("[LocalPeer] A file delete request was received from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
@@ -381,6 +429,9 @@ public class ServerThread extends Thread implements FileSystemObserver
                     }
 
                     case"FILE_MODIFY_REQUEST": {
+                        if (!handshakeCompleted)
+                            break;
+
                         log.info("[LocalPeer] A file modify request was received from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
@@ -434,6 +485,9 @@ public class ServerThread extends Thread implements FileSystemObserver
                     }
 
                     case"DIRECTORY_CREATE_REQUEST": {
+                        if (!handshakeCompleted)
+                            break;
+
                         log.info("[LocalPeer] A directory create request was received from " + clientHostPort.toString());
                         String pathName = JSON.getString("pathName");
 
@@ -474,6 +528,9 @@ public class ServerThread extends Thread implements FileSystemObserver
                     }
 
                     case"DIRECTORY_DELETE_REQUEST": {
+                        if (!handshakeCompleted)
+                            break;
+
                         log.info("[LocalPeer] A directory delete request was received from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
@@ -515,7 +572,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                 }
 
             }
-        } catch (IOException e) {
+        } catch (IOException | NullPointerException e) {
             log.info("[LocalPeer] Unable to communicate with " + clientHostPort.toString() + ", disconnected!");
 
         } catch (NoSuchAlgorithmException e) {
@@ -523,6 +580,7 @@ public class ServerThread extends Thread implements FileSystemObserver
 
         } finally {
             close();
+            localPeer.removeFromConnectedPeers(this);
         }
     }
 }

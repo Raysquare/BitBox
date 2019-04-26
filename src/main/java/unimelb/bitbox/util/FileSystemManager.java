@@ -890,7 +890,7 @@ public class FileSystemManager extends Thread {
         fis.seek(0);
         while ((bytesCount = fis.read(byteArray)) != -1) {
             digest.update(byteArray, 0, bytesCount);
-        };
+        }
         byte[] bytes = digest.digest();
         StringBuilder sb = new StringBuilder();
         for(int i=0; i< bytes.length ;i++)
@@ -907,7 +907,7 @@ public class FileSystemManager extends Thread {
         int bytesCount = 0;
         while ((bytesCount = fis.read(byteArray)) != -1) {
             digest.update(byteArray, 0, bytesCount);
-        };
+        }
         fis.close();
         byte[] bytes = digest.digest();
         StringBuilder sb = new StringBuilder();

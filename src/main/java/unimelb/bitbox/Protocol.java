@@ -293,15 +293,13 @@ public class Protocol {
         return JSON;
     }
 
-    //Could I put this method here? I am no sure.
-    public static FileDescriptor createFileDesctiptorFromDocument(FileSystemManager fileSystemManager,Document JSON){
-        Document fileDescri =(Document) JSON.get("fileDescriptor");
-        long lastModified = fileDescri.getLong("lastModified");
-        long fileSize = fileDescri.getLong("fileSize");
-        String md5 = fileDescri.getString("md5");
+    public static FileDescriptor createFileDesctiptorFromDocument(FileSystemManager fileSystemManager, Document JSON)
+    {
+        Document fileDescriptor =(Document) JSON.get("fileDescriptor");
+        long lastModified = fileDescriptor.getLong("lastModified");
+        long fileSize = fileDescriptor.getLong("fileSize");
+        String md5 = fileDescriptor.getString("md5");
 
-        return fileSystemManager.new FileDescriptor(lastModified,md5,fileSize);
+        return fileSystemManager.new FileDescriptor(lastModified, md5, fileSize);
     }
-
-
 }

@@ -47,7 +47,7 @@ public class Document {
 		if(val==null){
 			obj.put(key, null);
 		} else {
-			obj.put(key, new String(val));
+			obj.put(key, val);
 		}
 	}
 	
@@ -110,7 +110,7 @@ public class Document {
 	
 	private ArrayList<Object> getList(JSONArray o){
 		ArrayList<Object> list = new ArrayList<Object>();
-		for(Object l : (JSONArray)o){
+		for(Object l : o){
 			if(l instanceof JSONObject){
 				list.add(new Document((JSONObject) l));
 			} else if(l instanceof JSONArray){
@@ -125,7 +125,7 @@ public class Document {
 	public Object get(String key){
 		Object o = obj.get(key);
 		if(o instanceof JSONObject){
-			return (Object) new Document((JSONObject) o);
+			return new Document((JSONObject) o);
 		} else if(o instanceof JSONArray){
 			return getList((JSONArray)o);
 		} else {
