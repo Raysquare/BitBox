@@ -1,14 +1,17 @@
 package unimelb.bitbox;
 
-import java.util.Base64;
-import unimelb.bitbox.util.*;
-import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
+import unimelb.bitbox.util.Document;
+import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
+import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
+import unimelb.bitbox.util.FileSystemObserver;
+import unimelb.bitbox.util.HostPort;
 
 import java.io.*;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.logging.Logger;
 
 
