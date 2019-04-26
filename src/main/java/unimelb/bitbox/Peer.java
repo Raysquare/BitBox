@@ -33,8 +33,7 @@ public class Peer implements FileSystemObserver
 
         String initialPeersValue = Configuration.getConfigurationValue("peers");
         initialPeers = initialPeersValue.equals("") ? null : initialPeersValue.split(",");
-        int numInitialPeers = initialPeers == null ? 0 : initialPeers.length;
-        maxConnections = Integer.parseInt(numInitialPeers + Configuration.getConfigurationValue("maximumIncommingConnections"));
+        maxConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
         connectedPeers = new ArrayList<ServerThread>(maxConnections);
 
         InetAddress hostAddress = InetAddress.getLocalHost();
@@ -65,6 +64,7 @@ public class Peer implements FileSystemObserver
                 serverThread.sendHandshakeRequest();
                 serverThread.start(); // start the thread
                 connectedPeers.add(serverThread);
+                ++maxConnections;
 
             } catch (IOException e) {
                 log.info("[LocalPeer] Failed to connect to " + peer);
