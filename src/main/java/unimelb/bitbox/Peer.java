@@ -31,8 +31,10 @@ public class Peer implements FileSystemObserver
         fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
         blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
 
-        initialPeers = Configuration.getConfigurationValue("peers").split(",");
-        maxConnections = Integer.parseInt(initialPeers.length + Configuration.getConfigurationValue("maximumIncommingConnections"));
+        String initialPeersValue = Configuration.getConfigurationValue("peers");
+        initialPeers = initialPeersValue.equals("") ? null : initialPeersValue.split(",");
+        int numInitialPeers = initialPeers == null ? 0 : initialPeers.length;
+        maxConnections = Integer.parseInt(numInitialPeers + Configuration.getConfigurationValue("maximumIncommingConnections"));
         connectedPeers = new ArrayList<ServerThread>(maxConnections);
 
         InetAddress hostAddress = InetAddress.getLocalHost();
@@ -45,6 +47,9 @@ public class Peer implements FileSystemObserver
      */
     private void connectInitialPeers()
     {
+        if (initialPeers == null)
+            return;
+
         for (String peer : initialPeers) {
             String[] address = peer.split(":");
             String ip = address[0];

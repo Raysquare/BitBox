@@ -191,9 +191,9 @@ public class ServerThread extends Thread implements FileSystemObserver
 
                     case "CONNECTION_REFUSED":
                         log.info("[LocalPeer] A connection refused message was received from " + clientHostPort.toString());
-
-                        //TODO: handle the rest of protocol commands
-                        break;
+                        return;
+                        //TODO: this command hasn't been processed
+                        //break;
 
                     case "FILE_CREATE_REQUEST": {
                         log.info("[LocalPeer] A file create request was received from " + clientHostPort.toString());
