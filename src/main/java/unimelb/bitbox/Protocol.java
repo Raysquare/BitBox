@@ -5,8 +5,6 @@ import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 import unimelb.bitbox.util.HostPort;
 
-import javax.print.Doc;
-import java.io.File;
 import java.util.ArrayList;
 
 public class Protocol {
@@ -175,7 +173,7 @@ public class Protocol {
         return JSON;
     }
 
-    public static Document createFileBytesRequest(FileDescriptor fileDescriptor, String pathName, int position, int length){
+    public static Document createFileBytesRequest(FileDescriptor fileDescriptor, String pathName, long position, long length){
         Document JSON = new Document();
 
         JSON.append("command", "FILE_BYTES_REQUEST");
@@ -187,7 +185,7 @@ public class Protocol {
         return JSON;
     }
 
-    public static Document createFileBytesResponse(FileDescriptor fileDescriptor, String pathName, int position, int length, String content, String message, boolean status)
+    public static Document createFileBytesResponse(FileDescriptor fileDescriptor, String pathName, long position, long length, String content, String message, boolean status)
     {
         Document JSON = new Document();
 

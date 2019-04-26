@@ -59,6 +59,7 @@
 
 # File-based project format
 *.iws
+*.imi
 
 # IntelliJ
 out/

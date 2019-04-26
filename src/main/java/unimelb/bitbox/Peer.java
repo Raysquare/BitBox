@@ -22,12 +22,14 @@ public class Peer implements FileSystemObserver
     private HostPort localHost;
     private final ArrayList<ServerThread> connectedPeers;
     public FileSystemManager fileSystemManager;
+    public long blockSize;
 
     private static final Logger log = Logger.getLogger(Peer.class.getName());
 
     public Peer() throws IOException, NoSuchAlgorithmException
     {
         fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
+        blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
 
         initialPeers = Configuration.getConfigurationValue("peers").split(",");
         maxConnections = Integer.parseInt(initialPeers.length + Configuration.getConfigurationValue("maximumIncommingConnections"));
