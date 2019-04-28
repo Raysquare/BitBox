@@ -334,6 +334,8 @@ public class ServerThread extends Thread implements FileSystemObserver
                         if (!handshakeCompleted)
                             break;
 
+                        log.info("[LocalPeer] A file bytes request was received from " + clientHostPort.toString());
+
                         String pathName = JSON.getString("pathName");
                         long position = JSON.getLong("position");
                         long length = JSON.getLong("length");
@@ -344,8 +346,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         Document fileBytesMessage = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, "successful read", true);
 
                         synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
-
-                        log.info("[LocalPeer] A file bytes request was received from " + clientHostPort.toString());
+                        
                         log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE success to " + clientHostPort.toString());
                         log.info((fileBytesMessage.toJson()));
 
