@@ -77,6 +77,7 @@ public class Peer implements FileSystemObserver
      */
     private void setTimerForGenerateSyncEvents()
     {
+        long delay = 3 * 1000; // the timer will be started 3 seconds later
         int syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval")) * 1000;
 
         new Timer().scheduleAtFixedRate(new TimerTask() {
@@ -85,7 +86,7 @@ public class Peer implements FileSystemObserver
                 for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
                     processFileSystemEvent(event);
             }
-        }, 0, syncInterval);
+        }, delay, syncInterval);
     }
 
     /*

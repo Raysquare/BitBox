@@ -208,28 +208,34 @@ public class ServerThread extends Thread implements FileSystemObserver
 
                         for (Document peer : (ArrayList<Document>)JSON.get("peers")) {
                             HostPort peerHostPort = new HostPort(peer.getString("host"), (int) peer.getLong("port"));
-                            peerCandidates.add(peerHostPort);
+
+                            if (!peerCandidates.contains(peerHostPort))
+                                peerCandidates.add(peerHostPort);
                         }
 
                         if (peerCandidates.isEmpty())
                             return;
 
-                        clientHostPort = peerCandidates.poll();
+                        do {
+                            clientHostPort = peerCandidates.poll();
 
-                        try {
-                            log.info("[LocalPeer] Trying to connect to " + clientHostPort.toString());
-                            Socket newSocket = new Socket(clientHostPort.host, clientHostPort.port);
-                            close();
+                            try {
+                                log.info("[LocalPeer] Trying to connect to " + clientHostPort.toString());
+                                Socket newSocket = new Socket(clientHostPort.host, clientHostPort.port);
+                                close();
 
-                            input = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StandardCharsets.UTF_8));
-                            output = new BufferedWriter(new OutputStreamWriter(newSocket.getOutputStream(), StandardCharsets.UTF_8));
-                            socket = newSocket;
+                                input = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StandardCharsets.UTF_8));
+                                output = new BufferedWriter(new OutputStreamWriter(newSocket.getOutputStream(), StandardCharsets.UTF_8));
+                                socket = newSocket;
 
-                            sendHandshakeRequest();
+                                sendHandshakeRequest();
+                                break;
 
-                        } catch (IOException e) {
-                            log.info("[LocalPeer] Failed to connect to " + clientHostPort.toString());
-                        }
+                            } catch (IOException e) {
+                                log.info("[LocalPeer] Failed to connect to " + clientHostPort.toString());
+                            }
+
+                        } while (true);
 
                         break;
                     }
@@ -254,12 +260,12 @@ public class ServerThread extends Thread implements FileSystemObserver
                             log.info(errorMsg.toJson());
 
                         } else if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
-                            String errorString = "File name has existed: File create request failed";
+                            String errorString = "File with the same content has existed: File create request failed";
                             Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
 
                             synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
 
-                            log.info("[LocalPeer] File name has existed, refused request from " + clientHostPort.toString());
+                            log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
                             log.info(errorMsg.toJson());
 
@@ -362,14 +368,16 @@ public class ServerThread extends Thread implements FileSystemObserver
                         position += length;
                         length = Math.min(fileDescriptor.fileSize - position, length);
 
-                        if (!fileSystemManager.checkWriteComplete(pathName)) {
+                        if (!fileSystemManager.checkWriteComplete(pathName) && length != 0) {
                             Document fileBytesMessage = Protocol.createFileBytesRequest(fileDescriptor, pathName, position, length);
 
                             synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
 
                             log.info("[LocalPeer] Sent FILE_BYTES_REQUEST to " + clientHostPort.toString());
                             log.info((fileBytesMessage.toJson()));
-                        }
+
+                        } else
+                            fileSystemManager.cancelFileLoader(pathName);
 
                         break;
                     }
@@ -437,7 +445,17 @@ public class ServerThread extends Thread implements FileSystemObserver
                         String pathName = JSON.getString("pathName");
                         FileDescriptor fileDescriptor = Protocol.createFileDesctiptorFromDocument(fileSystemManager, JSON);
 
-                        if (!fileSystemManager.isSafePathName(pathName)) {
+                        if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
+                            String errorString = "File with the same content has existed: File modify request failed";
+                            Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
+
+                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+
+                            log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
+                            log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
+                            log.info(errorMsg.toJson());
+
+                        } else if (!fileSystemManager.isSafePathName(pathName)) {
                             String errorString = "Path name is unsafe: File modify request failed";
                             Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
 
