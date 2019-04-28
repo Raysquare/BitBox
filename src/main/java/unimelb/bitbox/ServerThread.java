@@ -193,6 +193,10 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A handshake request was received from " + clientHostPort.toString());
                         log.info("[LocalPeer] Sent HANDSHAKE_RESPONSE to " + clientHostPort.toString());
                         log.info((message.toJson()));
+
+                        for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
+                            processFileSystemEvent(event);
+
                         break;
                     }
 
@@ -200,6 +204,10 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A handshake response was received from " + clientHostPort.toString());
                         handshakeCompleted = true;
                         peerCandidates.clear();
+
+                        for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
+                            processFileSystemEvent(event);
+
                         break;
                     }
 
@@ -346,7 +354,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         Document fileBytesMessage = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, "successful read", true);
 
                         synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
-                        
+
                         log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE success to " + clientHostPort.toString());
                         log.info((fileBytesMessage.toJson()));
 

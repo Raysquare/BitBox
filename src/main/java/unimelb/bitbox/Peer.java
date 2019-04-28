@@ -4,10 +4,13 @@ import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import javax.net.ServerSocketFactory;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Timer;
@@ -36,8 +39,12 @@ public class Peer implements FileSystemObserver
         maxConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
         connectedPeers = new ArrayList<ServerThread>(maxConnections);
 
-        InetAddress hostAddress = InetAddress.getLocalHost();
-        localHost = new HostPort(hostAddress.getHostAddress(), Integer.parseInt(Configuration.getConfigurationValue("port")));
+        // get public ip
+        URL url = new URL("http://bot.whatismyipaddress.com");
+        BufferedReader responds = new BufferedReader(new InputStreamReader(url.openStream()));
+
+        String hostAddress = responds.readLine().trim();
+        localHost = new HostPort(hostAddress, Integer.parseInt(Configuration.getConfigurationValue("port")));
     }
 
     /*
@@ -50,7 +57,7 @@ public class Peer implements FileSystemObserver
             return;
 
         for (String peer : initialPeers) {
-            String[] address = peer.split(":");
+            String[] address = peer.trim().split(":");
             String ip = address[0];
             int port = Integer.parseInt(address[1]);
 
@@ -77,7 +84,6 @@ public class Peer implements FileSystemObserver
      */
     private void setTimerForGenerateSyncEvents()
     {
-        long delay = 3 * 1000; // the timer will be started 3 seconds later
         int syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval")) * 1000;
 
         new Timer().scheduleAtFixedRate(new TimerTask() {
@@ -86,7 +92,7 @@ public class Peer implements FileSystemObserver
                 for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
                     processFileSystemEvent(event);
             }
-        }, delay, syncInterval);
+        }, 0, syncInterval);
     }
 
     /*
