@@ -445,23 +445,23 @@ public class ServerThread extends Thread implements FileSystemObserver
                         String pathName = JSON.getString("pathName");
                         FileDescriptor fileDescriptor = Protocol.createFileDesctiptorFromDocument(fileSystemManager, JSON);
 
-                        if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
-                            String errorString = "File with the same content has existed: File modify request failed";
-                            Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
-
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
-
-                            log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
-                            log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
-                            log.info(errorMsg.toJson());
-
-                        } else if (!fileSystemManager.isSafePathName(pathName)) {
+                         if (!fileSystemManager.isSafePathName(pathName)) {
                             String errorString = "Path name is unsafe: File modify request failed";
                             Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
 
                             synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
 
                             log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
+                            log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
+                            log.info(errorMsg.toJson());
+
+                        } else if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
+                            String errorString = "File with the same content has existed: File modify request failed";
+                            Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
+
+                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+
+                            log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
                             log.info(errorMsg.toJson());
 
