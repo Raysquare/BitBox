@@ -221,10 +221,10 @@ public class ServerThread extends Thread implements FileSystemObserver
                                 peerCandidates.add(peerHostPort);
                         }
 
-                        if (peerCandidates.isEmpty())
+                        do {
+                            if (peerCandidates.isEmpty())
                             return;
 
-                        do {
                             clientHostPort = peerCandidates.poll();
 
                             try {
