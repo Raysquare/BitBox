@@ -16,9 +16,11 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedList;
 import java.util.logging.Logger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
-
-public class ServerThread extends Thread implements FileSystemObserver
+public class ServerThread extends Thread
 {
     private static final Logger log = Logger.getLogger(ServerThread.class.getName());
     private Peer localPeer;
@@ -30,6 +32,117 @@ public class ServerThread extends Thread implements FileSystemObserver
 
     private boolean handshakeCompleted;
     private LinkedList<HostPort> peerCandidates;
+
+    public FileSystemEventThread fileSystemEventThread;
+
+    class FileSystemEventThread extends Thread
+    {
+        private final Lock queueLocker;
+        private final Condition notEmptyQueue;
+        private LinkedList<FileSystemEvent> fileSystemEvents;
+
+        public FileSystemEventThread() {
+            queueLocker = new ReentrantLock();
+            notEmptyQueue = queueLocker.newCondition();
+            fileSystemEvents = new LinkedList<FileSystemEvent>();
+            start();
+        }
+
+        public void add(FileSystemEvent event) {
+            queueLocker.lock();
+            fileSystemEvents.add(event);
+            notEmptyQueue.signal();
+            queueLocker.unlock();
+        }
+
+        public void run() {
+            while (true) {
+                if (!handshakeCompleted)
+                    continue;
+
+                try {
+                    queueLocker.lock();
+
+                    while (fileSystemEvents.isEmpty())
+                        notEmptyQueue.await();
+
+                    FileSystemEvent fileSystemEvent = fileSystemEvents.poll();
+                    queueLocker.unlock();
+
+
+                    log.info("[LocalPeer] A system event was received");
+                    switch (fileSystemEvent.event) {
+                        case FILE_CREATE:
+                            Document message = Protocol.createFileCreateRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
+                            synchronized (output) {
+                                output.write(message.toJson());
+                                output.newLine();
+                                output.flush();
+                            }
+
+                            log.info("[LocalPeer] A file create event was received");
+                            log.info("[LocalPeer] Sent FILE_CREATE_REQUEST to " + clientHostPort.toString());
+                            log.info(message.toJson());
+                            break;
+
+                        case FILE_DELETE:
+                            message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
+                            synchronized (output) {
+                                output.write(message.toJson());
+                                output.newLine();
+                                output.flush();
+                            }
+
+                            log.info("[LocalPeer] A file delete event was received");
+                            log.info("[LocalPeer] Sent FILE_DELETE_REQUEST to " + clientHostPort.toString());
+                            log.info(message.toJson());
+                            break;
+
+                        case FILE_MODIFY:
+                            message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
+                            synchronized (output) {
+                                output.write(message.toJson());
+                                output.newLine();
+                                output.flush();
+                            }
+
+                            log.info("[LocalPeer] A file modify event was received");
+                            log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
+                            log.info(message.toJson());
+                            break;
+
+                        case DIRECTORY_CREATE:
+                            message = Protocol.createDirectoryCreateRequest(fileSystemEvent.pathName);
+                            synchronized (output) {
+                                output.write(message.toJson());
+                                output.newLine();
+                                output.flush();
+                            }
+
+                            log.info("[LocalPeer] A directory create event was received");
+                            log.info("[LocalPeer] Sent DIRECTORY_CREATE_REQUEST to " + clientHostPort.toString());
+                            log.info(message.toJson());
+                            break;
+
+                        case DIRECTORY_DELETE:
+                            message = Protocol.createDirectoryDeleteRequest(fileSystemEvent.pathName);
+                            synchronized (output) {
+                                output.write(message.toJson());
+                                output.newLine();
+                                output.flush();
+                            }
+
+                            log.info("[LocalPeer] A directory delete event was received");
+                            log.info("[LocalPeer] Sent DIRECTORY_DELETE_REQUEST to " + clientHostPort.toString());
+                            log.info(message.toJson());
+                            break;
+                    }
+                } catch (InterruptedException | IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 
     public ServerThread(Peer localPeer, Socket socket, HostPort serverHostPort, HostPort clientHostPort) throws IOException
     {
@@ -43,6 +156,9 @@ public class ServerThread extends Thread implements FileSystemObserver
         output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
 
         peerCandidates = new LinkedList<HostPort>();
+        fileSystemEventThread = new FileSystemEventThread();
+
+        start();
     }
 
     public void sendHandshakeRequest() throws IOException
@@ -70,63 +186,6 @@ public class ServerThread extends Thread implements FileSystemObserver
 
         log.info("[LocalPeer] Sent FILE_BYTES_REQUEST to " + clientHostPort.toString());
         log.info((fileByteMessage.toJson()));
-    }
-
-    public void processFileSystemEvent(FileSystemEvent fileSystemEvent)
-    {
-        if (!handshakeCompleted)
-            return;
-
-        try {
-            switch (fileSystemEvent.event) {
-                case FILE_CREATE:
-                    Document message = Protocol.createFileCreateRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                    synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
-
-                    log.info("[LocalPeer] A file create event was received");
-                    log.info("[LocalPeer] Sent FILE_CREATE_REQUEST to " + clientHostPort.toString());
-                    log.info(message.toJson());
-                    break;
-
-                case FILE_DELETE:
-                    message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                    synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
-
-                    log.info("[LocalPeer] A file delete event was received");
-                    log.info("[LocalPeer] Sent FILE_DELETE_REQUEST to " + clientHostPort.toString());
-                    log.info(message.toJson());
-                    break;
-
-                case FILE_MODIFY:
-                    message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                    synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
-
-                    log.info("[LocalPeer] A file modify event was received");
-                    log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
-                    log.info(message.toJson());
-                    break;
-
-                case DIRECTORY_CREATE:
-                    message = Protocol.createDirectoryCreateRequest(fileSystemEvent.pathName);
-                    synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
-
-                    log.info("[LocalPeer] A directory create event was received");
-                    log.info("[LocalPeer] Sent DIRECTORY_CREATE_REQUEST to " + clientHostPort.toString());
-                    log.info(message.toJson());
-                    break;
-
-                case DIRECTORY_DELETE:
-                    message = Protocol.createDirectoryDeleteRequest(fileSystemEvent.pathName);
-                    synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
-
-                    log.info("[LocalPeer] A directory delete event was received");
-                    log.info("[LocalPeer] Sent DIRECTORY_DELETE_REQUEST to " + clientHostPort.toString());
-                    log.info(message.toJson());
-                    break;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     private void close()
@@ -194,8 +253,10 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] Sent HANDSHAKE_RESPONSE to " + clientHostPort.toString());
                         log.info((message.toJson()));
 
-                        for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
-                            processFileSystemEvent(event);
+                        try {
+                            for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
+                                fileSystemEventThread.add(event);
+                        } catch (IllegalMonitorStateException e) {}
 
                         break;
                     }
@@ -205,8 +266,10 @@ public class ServerThread extends Thread implements FileSystemObserver
                         handshakeCompleted = true;
                         peerCandidates.clear();
 
-                        for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
-                            processFileSystemEvent(event);
+                        try {
+                            for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
+                                fileSystemEventThread.add(event);
+                        } catch (IllegalMonitorStateException e) {}
 
                         break;
                     }
