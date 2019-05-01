@@ -114,7 +114,7 @@ public class Peer implements FileSystemObserver
             String clientAddress = socket.getInetAddress().getHostAddress();
             int clientPort = socket.getPort();
             ServerThread serverThread = new ServerThread(this, socket, localHost, new HostPort(clientAddress, clientPort));
-            
+
             synchronized (connectedPeers) {
                 connectedPeers.add(serverThread);
             }
@@ -167,11 +167,9 @@ public class Peer implements FileSystemObserver
     public void processFileSystemEvent(FileSystemEvent fileSystemEvent)
     {
         synchronized (connectedPeers) {
-            try {
-                for (ServerThread peer : connectedPeers)
-                    peer.fileSystemEventThread.add(fileSystemEvent);
+            for (ServerThread peer : connectedPeers)
+                peer.fileSystemEventThread.add(fileSystemEvent);
 
-            } catch (IllegalMonitorStateException e) {}
         }
     }
 

@@ -49,10 +49,16 @@ public class ServerThread extends Thread
         }
 
         public void add(FileSystemEvent event) {
-            queueLocker.lock();
-            fileSystemEvents.add(event);
-            notEmptyQueue.signal();
-            queueLocker.unlock();
+            try {
+                queueLocker.lock();
+                fileSystemEvents.add(event);
+                notEmptyQueue.signal();
+
+            } catch (IllegalMonitorStateException e) {
+
+            } finally {
+                queueLocker.unlock();
+            }
         }
 
         public void run() {
@@ -253,10 +259,8 @@ public class ServerThread extends Thread
                         log.info("[LocalPeer] Sent HANDSHAKE_RESPONSE to " + clientHostPort.toString());
                         log.info((message.toJson()));
 
-                        try {
-                            for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
-                                fileSystemEventThread.add(event);
-                        } catch (IllegalMonitorStateException e) {}
+                        for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
+                            fileSystemEventThread.add(event);
 
                         break;
                     }
@@ -266,10 +270,8 @@ public class ServerThread extends Thread
                         handshakeCompleted = true;
                         peerCandidates.clear();
 
-                        try {
-                            for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
-                                fileSystemEventThread.add(event);
-                        } catch (IllegalMonitorStateException e) {}
+                        for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
+                            fileSystemEventThread.add(event);
 
                         break;
                     }
