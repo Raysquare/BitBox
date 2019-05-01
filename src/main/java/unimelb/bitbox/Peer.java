@@ -69,11 +69,12 @@ public class Peer implements FileSystemObserver
 
                 ServerThread serverThread = new ServerThread(this, socket, localHost, new HostPort(clientAddress, clientPort));
                 serverThread.sendHandshakeRequest();
-                serverThread.start(); // start the thread
+
                 synchronized (connectedPeers) {
                     connectedPeers.add(serverThread);
                     ++maxConnections;
                 }
+                serverThread.start(); // start the thread
 
             } catch (IOException e) {
                 log.info("[LocalPeer] Failed to connect to " + peer);
@@ -118,6 +119,7 @@ public class Peer implements FileSystemObserver
             synchronized (connectedPeers) {
                 connectedPeers.add(serverThread);
             }
+            serverThread.start();
         }
     }
 

@@ -45,7 +45,6 @@ public class ServerThread extends Thread
             queueLocker = new ReentrantLock();
             notEmptyQueue = queueLocker.newCondition();
             fileSystemEvents = new LinkedList<FileSystemEvent>();
-            start();
         }
 
         public void add(FileSystemEvent event) {
@@ -163,8 +162,11 @@ public class ServerThread extends Thread
 
         peerCandidates = new LinkedList<HostPort>();
         fileSystemEventThread = new FileSystemEventThread();
+    }
 
-        start();
+    public void start() {
+        super.start();
+        fileSystemEventThread.start();
     }
 
     public void sendHandshakeRequest() throws IOException
