@@ -278,7 +278,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                             log.info(errorMsg.toJson());
 
                         } else if (fileSystemManager.fileNameExists(pathName)) {
-                            if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.lastModified)) {
+                            if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified)) {
                                 String errorString = "There is a newer version: File create request failed";
                                 Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
 
@@ -474,7 +474,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                             log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
                             log.info(errorMsg.toJson());
 
-                        } else if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.lastModified)) {
+                        } else if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified)) {
                             String errorString = "File doesn't exist: File modify request failed";
                             Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
 
@@ -490,7 +490,7 @@ public class ServerThread extends Thread implements FileSystemObserver
 
                             synchronized (output) {output.write(fileModifyMessage.toJson()); output.newLine(); output.flush();}
 
-                            log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
+                            log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
                             log.info(fileModifyMessage.toJson());
 
                             sendFileBytesRequest(fileDescriptor, pathName);
