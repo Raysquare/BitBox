@@ -61,11 +61,10 @@ public class ServerThread extends Thread
         }
 
         public void run() {
-            while (true) {
-                if (!handshakeCompleted)
-                    continue;
-
-                try {
+            try {
+                while (true) {
+                    if (!handshakeCompleted)
+                        continue;
                     queueLocker.lock();
 
                     while (fileSystemEvents.isEmpty())
@@ -142,9 +141,9 @@ public class ServerThread extends Thread
                             log.info(message.toJson());
                             break;
                     }
-                } catch (InterruptedException | IOException e) {
-                    e.printStackTrace();
                 }
+            } catch (InterruptedException | IOException e) {
+                close();
             }
         }
     }
