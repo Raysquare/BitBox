@@ -9,6 +9,7 @@ import unimelb.bitbox.util.HostPort;
 
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
@@ -16,11 +17,10 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedList;
 import java.util.logging.Logger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class ServerThread extends Thread
+
+public class ServerThread extends Thread implements FileSystemObserver
 {
     private static final Logger log = Logger.getLogger(ServerThread.class.getName());
     private Peer localPeer;
@@ -32,118 +32,25 @@ public class ServerThread extends Thread
 
     private boolean handshakeCompleted;
     private LinkedList<HostPort> peerCandidates;
+    private ConcurrentLinkedQueue<String> messageQueue;
 
-    public FileSystemEventThread fileSystemEventThread;
+    private SenderThread senderThread;
 
-    class FileSystemEventThread extends Thread
-    {
-        private final Lock queueLocker;
-        private final Condition notEmptyQueue;
-        private LinkedList<FileSystemEvent> fileSystemEvents;
-
-        public FileSystemEventThread() {
-            queueLocker = new ReentrantLock();
-            notEmptyQueue = queueLocker.newCondition();
-            fileSystemEvents = new LinkedList<FileSystemEvent>();
-        }
-
-        public void add(FileSystemEvent event) {
-            try {
-                queueLocker.lock();
-                fileSystemEvents.add(event);
-                notEmptyQueue.signal();
-
-            } catch (IllegalMonitorStateException e) {
-
-            } finally {
-                queueLocker.unlock();
-            }
-        }
-
+    class SenderThread extends Thread {
         public void run() {
             try {
                 while (true) {
-                    if (!handshakeCompleted)
+                    String message = messageQueue.poll();
+
+                    if (message == null)
                         continue;
-                    queueLocker.lock();
 
-                    while (fileSystemEvents.isEmpty())
-                        notEmptyQueue.await();
-
-                    FileSystemEvent fileSystemEvent = fileSystemEvents.poll();
-                    queueLocker.unlock();
-
-
-                    log.info("[LocalPeer] A system event was received");
-                    switch (fileSystemEvent.event) {
-                        case FILE_CREATE:
-                            Document message = Protocol.createFileCreateRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                            synchronized (output) {
-                                output.write(message.toJson());
-                                output.newLine();
-                                output.flush();
-                            }
-
-                            log.info("[LocalPeer] A file create event was received");
-                            log.info("[LocalPeer] Sent FILE_CREATE_REQUEST to " + clientHostPort.toString());
-                            log.info(message.toJson());
-                            break;
-
-                        case FILE_DELETE:
-                            message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                            synchronized (output) {
-                                output.write(message.toJson());
-                                output.newLine();
-                                output.flush();
-                            }
-
-                            log.info("[LocalPeer] A file delete event was received");
-                            log.info("[LocalPeer] Sent FILE_DELETE_REQUEST to " + clientHostPort.toString());
-                            log.info(message.toJson());
-                            break;
-
-                        case FILE_MODIFY:
-                            message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                            synchronized (output) {
-                                output.write(message.toJson());
-                                output.newLine();
-                                output.flush();
-                            }
-
-                            log.info("[LocalPeer] A file modify event was received");
-                            log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
-                            log.info(message.toJson());
-                            break;
-
-                        case DIRECTORY_CREATE:
-                            message = Protocol.createDirectoryCreateRequest(fileSystemEvent.pathName);
-                            synchronized (output) {
-                                output.write(message.toJson());
-                                output.newLine();
-                                output.flush();
-                            }
-
-                            log.info("[LocalPeer] A directory create event was received");
-                            log.info("[LocalPeer] Sent DIRECTORY_CREATE_REQUEST to " + clientHostPort.toString());
-                            log.info(message.toJson());
-                            break;
-
-                        case DIRECTORY_DELETE:
-                            message = Protocol.createDirectoryDeleteRequest(fileSystemEvent.pathName);
-                            synchronized (output) {
-                                output.write(message.toJson());
-                                output.newLine();
-                                output.flush();
-                            }
-
-                            log.info("[LocalPeer] A directory delete event was received");
-                            log.info("[LocalPeer] Sent DIRECTORY_DELETE_REQUEST to " + clientHostPort.toString());
-                            log.info(message.toJson());
-                            break;
-                    }
+                    output.write(message);
+                    output.newLine();
+                    output.flush();
                 }
-            } catch (InterruptedException | IOException e) {
-                close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }
@@ -160,22 +67,17 @@ public class ServerThread extends Thread
         output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
 
         peerCandidates = new LinkedList<HostPort>();
-        fileSystemEventThread = new FileSystemEventThread();
-    }
+        messageQueue = new ConcurrentLinkedQueue<String>();
 
-    public void start() {
-        super.start();
-        fileSystemEventThread.start();
+        senderThread = new SenderThread();
+        senderThread.start();
     }
 
     public void sendHandshakeRequest() throws IOException
     {
         Document handshakeRequest = Protocol.createHandshakeRequest(serverHostPort);
 
-        output.write(handshakeRequest.toJson());
-        output.newLine();
-        output.flush();
-
+        messageQueue.offer(handshakeRequest.toJson());
         log.info("[LocalPeer] Sent a handshake request to " + clientHostPort.toString());
         log.info(handshakeRequest.toJson());
     }
@@ -185,14 +87,62 @@ public class ServerThread extends Thread
         long length = Math.min(localPeer.blockSize, fileDescriptor.fileSize);
         Document fileByteMessage = Protocol.createFileBytesRequest(fileDescriptor, pathName, 0, length);
 
-        synchronized (output) {
-            output.write(fileByteMessage.toJson());
-            output.newLine();
-            output.flush();
-        }
-
+        messageQueue.offer(fileByteMessage.toJson());
         log.info("[LocalPeer] Sent FILE_BYTES_REQUEST to " + clientHostPort.toString());
         log.info((fileByteMessage.toJson()));
+    }
+
+    public void processFileSystemEvent(FileSystemEvent fileSystemEvent)
+    {
+        if (!handshakeCompleted)
+            return;
+
+        switch (fileSystemEvent.event) {
+            case FILE_CREATE:
+                Document message = Protocol.createFileCreateRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
+                messageQueue.offer(message.toJson());
+
+                log.info("[LocalPeer] A file create event was received");
+                log.info("[LocalPeer] Sent FILE_CREATE_REQUEST to " + clientHostPort.toString());
+                log.info(message.toJson());
+                break;
+
+            case FILE_DELETE:
+                message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
+                messageQueue.offer(message.toJson());
+
+                log.info("[LocalPeer] A file delete event was received");
+                log.info("[LocalPeer] Sent FILE_DELETE_REQUEST to " + clientHostPort.toString());
+                log.info(message.toJson());
+                break;
+
+            case FILE_MODIFY:
+                message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
+                messageQueue.offer(message.toJson());
+
+                log.info("[LocalPeer] A file modify event was received");
+                log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
+                log.info(message.toJson());
+                break;
+
+            case DIRECTORY_CREATE:
+                message = Protocol.createDirectoryCreateRequest(fileSystemEvent.pathName);
+                messageQueue.offer(message.toJson());
+
+                log.info("[LocalPeer] A directory create event was received");
+                log.info("[LocalPeer] Sent DIRECTORY_CREATE_REQUEST to " + clientHostPort.toString());
+                log.info(message.toJson());
+                break;
+
+            case DIRECTORY_DELETE:
+                message = Protocol.createDirectoryDeleteRequest(fileSystemEvent.pathName);
+                messageQueue.offer(message.toJson());
+
+                log.info("[LocalPeer] A directory delete event was received");
+                log.info("[LocalPeer] Sent DIRECTORY_DELETE_REQUEST to " + clientHostPort.toString());
+                log.info(message.toJson());
+                break;
+        }
     }
 
     private void close()
@@ -221,7 +171,7 @@ public class ServerThread extends Thread
 
                 if (!Protocol.isValid(JSON)) {
                     Document errorMsg = Protocol.createInvalidProtocol("Invalid protocol: the message misses required fields");
-                    synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                    messageQueue.offer(errorMsg.toJson());
 
                     log.info("[LocalPeer] A message missing required fields was received from " + clientHostPort.toString());
                     log.info("[LocalPeer] Sent INVALID_PROTOCOL to " + clientHostPort.toString());
@@ -233,7 +183,7 @@ public class ServerThread extends Thread
                     case "HANDSHAKE_REQUEST": {
                         if (handshakeCompleted) {
                             Document errorMsg = Protocol.createInvalidProtocol("Invalid protocol: handshake has been completed");
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] Multiple handshakes were received from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent INVALID_PROTOCOL to " + clientHostPort.toString());
@@ -244,7 +194,7 @@ public class ServerThread extends Thread
                         if (localPeer.hasReachedMaxConnections()) {
                             String errorString = "The maximum connections has been reached";
                             Document errorMsg = Protocol.createConnectionRefused(errorString, localPeer.getConnectedPeerHostPort(clientHostPort));
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] The maximum connections were reached, disconnected from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent CONNECTION_REFUSED to " + clientHostPort.toString());
@@ -253,7 +203,7 @@ public class ServerThread extends Thread
                         }
 
                         Document message = Protocol.createHandshakeResponse(serverHostPort);
-                        synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
+                        messageQueue.offer(message.toJson());
                         handshakeCompleted = true;
 
                         log.info("[LocalPeer] A handshake request was received from " + clientHostPort.toString());
@@ -261,7 +211,7 @@ public class ServerThread extends Thread
                         log.info((message.toJson()));
 
                         for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
-                            fileSystemEventThread.add(event);
+                            processFileSystemEvent(event);
 
                         break;
                     }
@@ -272,7 +222,7 @@ public class ServerThread extends Thread
                         peerCandidates.clear();
 
                         for (FileSystemEvent event : fileSystemManager.generateSyncEvents())
-                            fileSystemEventThread.add(event);
+                            processFileSystemEvent(event);
 
                         break;
                     }
@@ -284,12 +234,12 @@ public class ServerThread extends Thread
                             HostPort peerHostPort = new HostPort(peer.getString("host"), (int) peer.getLong("port"));
 
                             if (!peerCandidates.contains(peerHostPort))
-                                peerCandidates.add(peerHostPort);
+                                peerCandidates.offer(peerHostPort);
                         }
 
                         do {
                             if (peerCandidates.isEmpty())
-                            return;
+                                return;
 
                             clientHostPort = peerCandidates.poll();
 
@@ -327,7 +277,7 @@ public class ServerThread extends Thread
                             String errorString = "Path name is unsafe: File create request failed";
                             Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
@@ -337,7 +287,7 @@ public class ServerThread extends Thread
                             String errorString = "File with the same content has existed: File create request failed";
                             Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
@@ -348,7 +298,7 @@ public class ServerThread extends Thread
                                 String errorString = "There is a newer version: File create request failed";
                                 Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
 
-                                synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                                messageQueue.offer(errorMsg.toJson());
 
                                 log.info("[LocalPeer] There is a newer version, refused request from " + clientHostPort.toString());
                                 log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
@@ -358,7 +308,7 @@ public class ServerThread extends Thread
                                 String messageString = "Overwrite the older version";
                                 Document message = Protocol.createFileCreateResponse(fileDescriptor, pathName, messageString, true);
 
-                                synchronized (output) {output.write(message.toJson()); output.newLine(); output.flush();}
+                                messageQueue.offer(message.toJson());
 
                                 log.info("[LocalPeer] Overwrite the older version and get a new one from " + clientHostPort.toString());
                                 log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
@@ -374,14 +324,14 @@ public class ServerThread extends Thread
                                 log.info("[LocalPeer] There is a file with the same content, no need to transfer it again from " + clientHostPort.toString());
                                 Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
 
-                                synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                                messageQueue.offer(errorMsg.toJson());
                                 break;
                             }
 
                             String messageString = "File loader ready";
                             Document fileCreateMessage = Protocol.createFileCreateResponse(fileDescriptor, pathName, messageString, true);
 
-                            synchronized (output) {output.write(fileCreateMessage.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(fileCreateMessage.toJson());
 
                             log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
                             log.info(fileCreateMessage.toJson());
@@ -419,7 +369,7 @@ public class ServerThread extends Thread
                         String content = Base64.getEncoder().encodeToString(bytes);
                         Document fileBytesMessage = Protocol.createFileBytesResponse(fileDescriptor, pathName, position, length, content, "successful read", true);
 
-                        synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
+                        messageQueue.offer(fileBytesMessage.toJson());
 
                         log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE success to " + clientHostPort.toString());
                         log.info((fileBytesMessage.toJson()));
@@ -446,7 +396,7 @@ public class ServerThread extends Thread
                         if (!fileSystemManager.checkWriteComplete(pathName) && length != 0) {
                             Document fileBytesMessage = Protocol.createFileBytesRequest(fileDescriptor, pathName, position, length);
 
-                            synchronized (output) {output.write(fileBytesMessage.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(fileBytesMessage.toJson());
 
                             log.info("[LocalPeer] Sent FILE_BYTES_REQUEST to " + clientHostPort.toString());
                             log.info((fileBytesMessage.toJson()));
@@ -470,7 +420,7 @@ public class ServerThread extends Thread
                             String errorString = "Path name is unsafe: File delete request failed";
                             Document errorMsg = Protocol.createFileDeleteResponse(fileDescriptor, pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_DELETE_RESPONSE to " + clientHostPort.toString());
@@ -480,7 +430,7 @@ public class ServerThread extends Thread
                             String errorString = "File doesn't exist: File delete request failed";
                             Document errorMsg = Protocol.createFileDeleteResponse(fileDescriptor, pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] File name has existed, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_DELETE_RESPONSE to " + clientHostPort.toString());
@@ -490,7 +440,7 @@ public class ServerThread extends Thread
                             String messageString = "The file was deleted";
                             Document fileDeleteMessage = Protocol.createFileDeleteResponse(fileDescriptor, pathName, messageString, true);
 
-                            synchronized (output) {output.write(fileDeleteMessage.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(fileDeleteMessage.toJson());
 
                             log.info("[LocalPeer] Sent FILE_DELETE_RESPONSE to " + clientHostPort.toString());
                             log.info(fileDeleteMessage.toJson());
@@ -524,7 +474,7 @@ public class ServerThread extends Thread
                             String errorString = "Path name is unsafe: File modify request failed";
                             Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                             messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
@@ -534,7 +484,7 @@ public class ServerThread extends Thread
                             String errorString = "File with the same content has existed: File modify request failed";
                             Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
@@ -544,7 +494,7 @@ public class ServerThread extends Thread
                             String errorString = "File doesn't exist: File modify request failed";
                             Document errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] File name has existed, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
@@ -554,7 +504,7 @@ public class ServerThread extends Thread
                             String messageString = "Modify file loader ready";
                             Document fileModifyMessage = Protocol.createFileModifyResponse(fileDescriptor, pathName, messageString, true);
 
-                            synchronized (output) {output.write(fileModifyMessage.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(fileModifyMessage.toJson());
 
                             log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
                             log.info(fileModifyMessage.toJson());
@@ -588,7 +538,7 @@ public class ServerThread extends Thread
                             String errorString = "Path name is unsafe: Directory create request failed";
                             Document errorMsg = Protocol.createDirectoryCreateResponse(pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent DIRECTORY_CREATE_RESPONSE to " + clientHostPort.toString());
@@ -598,7 +548,7 @@ public class ServerThread extends Thread
                             String errorString = "Directory name has existed: Directory create request failed";
                             Document errorMsg = Protocol.createDirectoryCreateResponse(pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] Directory name has existed, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent DIRECTORY_CREATE_RESPONSE to " + clientHostPort.toString());
@@ -609,7 +559,7 @@ public class ServerThread extends Thread
                             String messageString = "Directory was created";
                             Document directoryCreateMessage = Protocol.createDirectoryCreateResponse(pathName, messageString, true);
 
-                            synchronized (output) {output.write(directoryCreateMessage.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(directoryCreateMessage.toJson());
                         }
 
                         break;
@@ -631,7 +581,7 @@ public class ServerThread extends Thread
                             String errorString = "Path name is unsafe: Directory delete request failed";
                             Document errorMsg = Protocol.createDirectoryDeleteResponse(pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent DIRECTORY_DELETE_RESPONSE to " + clientHostPort.toString());
@@ -641,7 +591,7 @@ public class ServerThread extends Thread
                             String errorString = "Directory doesn't exist: Directory delete request failed";
                             Document errorMsg = Protocol.createDirectoryDeleteResponse(pathName, errorString, false);
 
-                            synchronized (output) {output.write(errorMsg.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] Directory doesn't exist, refused request from " + clientHostPort.toString());
                             log.info("[LocalPeer] Sent DIRECTORY_DELETE_RESPONSE to " + clientHostPort.toString());
@@ -652,7 +602,7 @@ public class ServerThread extends Thread
                             String messageString = "Directory was deleted";
                             Document directoryDeleteMessage = Protocol.createDirectoryDeleteResponse(pathName, messageString, true);
 
-                            synchronized (output) {output.write(directoryDeleteMessage.toJson()); output.newLine(); output.flush();}
+                            messageQueue.offer(directoryDeleteMessage.toJson());
                         }
 
                         break;
