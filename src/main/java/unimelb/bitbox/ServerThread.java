@@ -39,7 +39,7 @@ public class ServerThread extends Thread implements FileSystemObserver
     class SenderThread extends Thread {
         public void run() {
             try {
-                while (true) {
+                while (!this.isInterrupted()) {
                     String message = messageQueue.poll();
 
                     if (message == null)
@@ -49,6 +49,9 @@ public class ServerThread extends Thread implements FileSystemObserver
                     output.newLine();
                     output.flush();
                 }
+
+            } catch (SocketException e) {
+                
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -617,6 +620,9 @@ public class ServerThread extends Thread implements FileSystemObserver
             }
         } catch (IOException | NullPointerException e) {
             log.info("[LocalPeer] Unable to communicate with " + clientHostPort.toString() + ", disconnected!");
+            senderThread.interrupt();
+
+            try {senderThread.join();} catch (InterruptedException v) {}
 
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
