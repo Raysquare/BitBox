@@ -42,16 +42,18 @@ public class ServerThread extends Thread implements FileSystemObserver
                 while (!this.isInterrupted()) {
                     String message = messageQueue.poll();
 
-                    if (message == null)
+                    if (message == null) {
+                        this.sleep(500);
                         continue;
+                    }
 
                     output.write(message);
                     output.newLine();
                     output.flush();
                 }
 
-            } catch (SocketException e) {
-                
+            } catch (InterruptedException | SocketException e) {
+
             } catch (IOException e) {
                 e.printStackTrace();
             }
