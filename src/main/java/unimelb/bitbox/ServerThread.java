@@ -16,8 +16,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedList;
-import java.util.logging.Logger;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Logger;
 
 
 public class ServerThread extends Thread implements FileSystemObserver
@@ -28,7 +28,8 @@ public class ServerThread extends Thread implements FileSystemObserver
     private BufferedReader input;
     private BufferedWriter output;
     private HostPort serverHostPort;
-    public HostPort clientHostPort;
+    private HostPort clientHostPort; // the host port that is used by client to connect to the local peer
+    public HostPort clientSideServerHostPort; // the server host port on the client side
 
     private boolean handshakeCompleted;
     private LinkedList<HostPort> peerCandidates;
@@ -55,7 +56,23 @@ public class ServerThread extends Thread implements FileSystemObserver
             } catch (InterruptedException | SocketException e) {
 
             } catch (IOException e) {
-                e.printStackTrace();
+
+            } finally {
+                try {
+                    while (!messageQueue.isEmpty()) {
+                        String message = messageQueue.poll();
+
+                        if (message == null) {
+                            continue;
+                        }
+
+                        output.write(message);
+                        output.newLine();
+                        output.flush();
+                    }
+
+                } catch (SocketException e) {
+                } catch (IOException e) {}
             }
         }
     }
@@ -196,9 +213,12 @@ public class ServerThread extends Thread implements FileSystemObserver
                             return;
                         }
 
+                        Document hostPort = (Document)JSON.get("hostPort");
+                        clientSideServerHostPort = new HostPort(hostPort.getString("host"), (int)hostPort.getLong("port"));
+
                         if (localPeer.hasReachedMaxConnections()) {
                             String errorString = "The maximum connections has been reached";
-                            Document errorMsg = Protocol.createConnectionRefused(errorString, localPeer.getConnectedPeerHostPort(clientHostPort));
+                            Document errorMsg = Protocol.createConnectionRefused(errorString, localPeer.getConnectedPeerHostPort(clientSideServerHostPort));
                             messageQueue.offer(errorMsg.toJson());
 
                             log.info("[LocalPeer] The maximum connections were reached, disconnected from " + clientHostPort.toString());
@@ -209,6 +229,7 @@ public class ServerThread extends Thread implements FileSystemObserver
 
                         Document message = Protocol.createHandshakeResponse(serverHostPort);
                         messageQueue.offer(message.toJson());
+
                         handshakeCompleted = true;
 
                         log.info("[LocalPeer] A handshake request was received from " + clientHostPort.toString());
@@ -223,6 +244,7 @@ public class ServerThread extends Thread implements FileSystemObserver
 
                     case "HANDSHAKE_RESPONSE": {
                         log.info("[LocalPeer] A handshake response was received from " + clientHostPort.toString());
+                        clientSideServerHostPort = clientHostPort;
                         handshakeCompleted = true;
                         peerCandidates.clear();
 
@@ -236,7 +258,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A connection refused message was received from " + clientHostPort.toString());
 
                         for (Document peer : (ArrayList<Document>)JSON.get("peers")) {
-                            HostPort peerHostPort = new HostPort(peer.getString("host"), (int) peer.getLong("port"));
+                            HostPort peerHostPort = new HostPort(peer.getString("host"), (int)peer.getLong("port"));
 
                             if (!peerCandidates.contains(peerHostPort))
                                 peerCandidates.offer(peerHostPort);
@@ -322,26 +344,35 @@ public class ServerThread extends Thread implements FileSystemObserver
                             }
 
                         } else {
-                            fileSystemManager.createFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified);
+                            try {
+                                fileSystemManager.createFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified);
 
-                            if (fileSystemManager.checkShortcut(pathName)) {
-                                String errorString = "There is a file with the same content, no need to transfer it again.";
-                                log.info("[LocalPeer] There is a file with the same content, no need to transfer it again from " + clientHostPort.toString());
+                                if (fileSystemManager.checkShortcut(pathName)) {
+                                    String errorString = "There is a file with the same content, no need to transfer it again.";
+                                    log.info("[LocalPeer] There is a file with the same content, no need to transfer it again from " + clientHostPort.toString());
+                                    Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
+
+                                    messageQueue.offer(errorMsg.toJson());
+                                    break;
+                                }
+
+                                String messageString = "File loader ready";
+                                Document fileCreateMessage = Protocol.createFileCreateResponse(fileDescriptor, pathName, messageString, true);
+
+                                messageQueue.offer(fileCreateMessage.toJson());
+
+                                log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
+                                log.info(fileCreateMessage.toJson());
+
+                                sendFileBytesRequest(fileDescriptor, pathName);
+
+                            } catch (IOException e) {
+                                String errorString = "Cannot create the file loader";
+                                log.info("[LocalPeer] Cannot create the file loader, refused request from " + clientHostPort.toString());
                                 Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
 
                                 messageQueue.offer(errorMsg.toJson());
-                                break;
                             }
-
-                            String messageString = "File loader ready";
-                            Document fileCreateMessage = Protocol.createFileCreateResponse(fileDescriptor, pathName, messageString, true);
-
-                            messageQueue.offer(fileCreateMessage.toJson());
-
-                            log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
-                            log.info(fileCreateMessage.toJson());
-
-                            sendFileBytesRequest(fileDescriptor, pathName);
                         }
 
                         break;
@@ -620,18 +651,22 @@ public class ServerThread extends Thread implements FileSystemObserver
                 }
 
             }
-        } catch (IOException | NullPointerException e) {
+        } catch (SocketException | NullPointerException e) {
             log.info("[LocalPeer] Unable to communicate with " + clientHostPort.toString() + ", disconnected!");
-            senderThread.interrupt();
 
-            try {senderThread.join();} catch (InterruptedException v) {}
-
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
+        } catch (IOException | NoSuchAlgorithmException e) {
+            log.info("[LocalPeer] Unable to communicate with " + clientHostPort.toString() + ", disconnected!");
 
         } finally {
-            close();
             localPeer.removeFromConnectedPeers(this);
+
+            try {
+                senderThread.interrupt();
+                senderThread.join();
+
+            } catch (InterruptedException v) {}
+
+            close();
         }
     }
 }

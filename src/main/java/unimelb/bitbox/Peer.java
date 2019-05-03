@@ -4,13 +4,9 @@ import unimelb.bitbox.util.*;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import javax.net.ServerSocketFactory;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.URL;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Timer;
@@ -39,11 +35,14 @@ public class Peer implements FileSystemObserver
         maxConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
         connectedPeers = new ArrayList<ServerThread>(maxConnections);
 
+        /*
         // get public ip
         URL url = new URL("http://bot.whatismyipaddress.com");
         BufferedReader responds = new BufferedReader(new InputStreamReader(url.openStream()));
-
         String hostAddress = responds.readLine().trim();
+        */
+
+        String hostAddress = Configuration.getConfigurationValue("advertisedName");
         localHost = new HostPort(hostAddress, Integer.parseInt(Configuration.getConfigurationValue("port")));
     }
 
@@ -149,8 +148,8 @@ public class Peer implements FileSystemObserver
             ArrayList<Document> hostPorts = new ArrayList<Document>(connectedPeers.size());
 
             for (ServerThread peer : connectedPeers) {
-                if (!peer.clientHostPort.equals(hostPort))
-                    hostPorts.add(peer.clientHostPort.toDoc());
+                if (!peer.clientSideServerHostPort.equals(hostPort))
+                    hostPorts.add(peer.clientSideServerHostPort.toDoc());
             }
 
             return hostPorts;
