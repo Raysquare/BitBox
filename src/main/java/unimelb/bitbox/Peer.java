@@ -28,11 +28,11 @@ public class Peer implements FileSystemObserver
     public Peer() throws IOException, NoSuchAlgorithmException
     {
         fileSystemManager = new FileSystemManager(Configuration.getConfigurationValue("path"), this);
-        blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize"));
+        blockSize = Long.parseLong(Configuration.getConfigurationValue("blockSize").trim());
 
         String initialPeersValue = Configuration.getConfigurationValue("peers");
         initialPeers = initialPeersValue.equals("") ? null : initialPeersValue.split(",");
-        maxConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections"));
+        maxConnections = Integer.parseInt(Configuration.getConfigurationValue("maximumIncommingConnections").trim());
         connectedPeers = new ArrayList<ServerThread>(maxConnections);
 
         /*
@@ -42,8 +42,8 @@ public class Peer implements FileSystemObserver
         String hostAddress = responds.readLine().trim();
         */
 
-        String hostAddress = Configuration.getConfigurationValue("advertisedName");
-        localHost = new HostPort(hostAddress, Integer.parseInt(Configuration.getConfigurationValue("port")));
+        String hostAddress = Configuration.getConfigurationValue("advertisedName").trim();
+        localHost = new HostPort(hostAddress, Integer.parseInt(Configuration.getConfigurationValue("port").trim()));
     }
 
     /*

@@ -214,7 +214,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         }
 
                         Document hostPort = (Document)JSON.get("hostPort");
-                        clientSideServerHostPort = new HostPort(hostPort.getString("host"), (int)hostPort.getLong("port"));
+                        clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
 
                         if (localPeer.hasReachedMaxConnections()) {
                             String errorString = "The maximum connections has been reached";
