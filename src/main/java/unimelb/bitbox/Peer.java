@@ -85,7 +85,7 @@ public class Peer implements FileSystemObserver
      */
     private void setTimerForGenerateSyncEvents()
     {
-        int syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval")) * 1000;
+        int syncInterval = Integer.parseInt(Configuration.getConfigurationValue("syncInterval").trim()) * 1000;
 
         new Timer().scheduleAtFixedRate(new TimerTask() {
             public void run() {
@@ -128,8 +128,8 @@ public class Peer implements FileSystemObserver
     }
 
     /*
-        This method will be called by 'ServerMain' objects if receiving an invalid protocol or a handshake
-        request after handshake has been completed
+        This method will be called by 'ServerThread' objects if there is a catastrophic error
+        occurred in ServerThread
      */
     public void removeFromConnectedPeers(ServerThread obj)
     {

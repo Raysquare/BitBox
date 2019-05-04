@@ -293,7 +293,7 @@ public class Protocol {
         return JSON;
     }
 
-    public static FileDescriptor createFileDesctiptorFromDocument(FileSystemManager fileSystemManager, Document JSON)
+    public static FileDescriptor createFileDescriptorFromDocument(FileSystemManager fileSystemManager, Document JSON)
     {
         Document fileDescriptor =(Document) JSON.get("fileDescriptor");
         long lastModified = fileDescriptor.getLong("lastModified");

@@ -19,11 +19,13 @@ import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 
-
+/*
+    Each connection will have a server thread associated with it.
+ */
 public class ServerThread extends Thread implements FileSystemObserver
 {
     private static final Logger log = Logger.getLogger(ServerThread.class.getName());
-    private Peer localPeer;
+    private Peer localPeer; // the delegate object to the Peer instance
     private Socket socket;
     private BufferedReader input;
     private BufferedWriter output;
@@ -32,11 +34,15 @@ public class ServerThread extends Thread implements FileSystemObserver
     public HostPort clientSideServerHostPort; // the server host port on the client side
 
     private boolean handshakeCompleted;
-    private LinkedList<HostPort> peerCandidates;
+    private LinkedList<HostPort> peerCandidates; // it is used to store peer list when receiving CONNECTION_REFUSED
     private ConcurrentLinkedQueue<String> messageQueue;
 
     private SenderThread senderThread;
 
+    /*
+        This is a dedicated thread used for sending all outgoing messages to the corresponding peer.
+        This is the only thread that need to use the output object.
+     */
     class SenderThread extends Thread {
         public void run() {
             try {
@@ -58,6 +64,8 @@ public class ServerThread extends Thread implements FileSystemObserver
             } catch (IOException e) {
 
             } finally {
+                // if the thread is interrupted, then sends the rest of outgoing messages
+                // to the corresponding peer
                 try {
                     while (!messageQueue.isEmpty()) {
                         String message = messageQueue.poll();
@@ -95,7 +103,7 @@ public class ServerThread extends Thread implements FileSystemObserver
         senderThread.start();
     }
 
-    public void sendHandshakeRequest() throws IOException
+    public void sendHandshakeRequest()
     {
         Document handshakeRequest = Protocol.createHandshakeRequest(serverHostPort);
 
@@ -104,7 +112,7 @@ public class ServerThread extends Thread implements FileSystemObserver
         log.info(handshakeRequest.toJson());
     }
 
-    public void sendFileBytesRequest(FileDescriptor fileDescriptor, String pathName) throws IOException
+    public void sendFileBytesRequest(FileDescriptor fileDescriptor, String pathName)
     {
         long length = Math.min(localPeer.blockSize, fileDescriptor.fileSize);
         Document fileByteMessage = Protocol.createFileBytesRequest(fileDescriptor, pathName, 0, length);
@@ -114,6 +122,9 @@ public class ServerThread extends Thread implements FileSystemObserver
         log.info((fileByteMessage.toJson()));
     }
 
+    /*
+        This methods creates corresponding messages when receiving file system events
+     */
     public void processFileSystemEvent(FileSystemEvent fileSystemEvent)
     {
         if (!handshakeCompleted)
@@ -213,6 +224,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                             return;
                         }
 
+                        // store the host port sent from the peer
                         Document hostPort = (Document)JSON.get("hostPort");
                         clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
 
@@ -254,27 +266,33 @@ public class ServerThread extends Thread implements FileSystemObserver
                         break;
                     }
 
+                    // try to connect to peers in the peer list in BFS order
                     case "CONNECTION_REFUSED": {
                         log.info("[LocalPeer] A connection refused message was received from " + clientHostPort.toString());
 
+                        // get peers needed to try from the peer list
                         for (Document peer : (ArrayList<Document>)JSON.get("peers")) {
                             HostPort peerHostPort = new HostPort(peer.getString("host"), (int)peer.getLong("port"));
 
+                            // remove duplicated peers
                             if (!peerCandidates.contains(peerHostPort))
                                 peerCandidates.offer(peerHostPort);
                         }
 
                         do {
+                            // if there is no peer to connect, then closes the thread
                             if (peerCandidates.isEmpty())
                                 return;
 
+                            // get a peer to connect
                             clientHostPort = peerCandidates.poll();
 
                             try {
                                 log.info("[LocalPeer] Trying to connect to " + clientHostPort.toString());
                                 Socket newSocket = new Socket(clientHostPort.host, clientHostPort.port);
-                                close();
 
+                                // the peer is successfully connected, close the current socket and get new socket
+                                close();
                                 input = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StandardCharsets.UTF_8));
                                 output = new BufferedWriter(new OutputStreamWriter(newSocket.getOutputStream(), StandardCharsets.UTF_8));
                                 socket = newSocket;
@@ -298,7 +316,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A file create request was received from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
-                        FileDescriptor fileDescriptor = Protocol.createFileDesctiptorFromDocument(fileSystemManager, JSON);
+                        FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
 
                         if (!fileSystemManager.isSafePathName(pathName)) {
                             String errorString = "Path name is unsafe: File create request failed";
@@ -310,6 +328,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                             log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
                             log.info(errorMsg.toJson());
 
+                            // if the file with the same content exists, then reject the request
                         } else if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
                             String errorString = "File with the same content has existed: File create request failed";
                             Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
@@ -320,7 +339,10 @@ public class ServerThread extends Thread implements FileSystemObserver
                             log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
                             log.info(errorMsg.toJson());
 
+                            // if the file exists but with different content, then try to modify it
                         } else if (fileSystemManager.fileNameExists(pathName)) {
+
+                            // if the file is newer, then reject the request, otherwise overwrite the current older file
                             if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified)) {
                                 String errorString = "There is a newer version: File create request failed";
                                 Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
@@ -347,6 +369,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                             try {
                                 fileSystemManager.createFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified);
 
+                                // if there is a file with a different name but the same content, then reject the request, otherwise then the request is accepted
                                 if (fileSystemManager.checkShortcut(pathName)) {
                                     String errorString = "There is a file with the same content, no need to transfer it again.";
                                     log.info("[LocalPeer] There is a file with the same content, no need to transfer it again from " + clientHostPort.toString());
@@ -367,7 +390,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                                 sendFileBytesRequest(fileDescriptor, pathName);
 
                             } catch (IOException e) {
-                                String errorString = "Cannot create the file loader";
+                                String errorString = "Cannot create the file loader as it has already been created";
                                 log.info("[LocalPeer] Cannot create the file loader, refused request from " + clientHostPort.toString());
                                 Document errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false);
 
@@ -399,7 +422,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         String pathName = JSON.getString("pathName");
                         long position = JSON.getLong("position");
                         long length = JSON.getLong("length");
-                        FileDescriptor fileDescriptor = Protocol.createFileDesctiptorFromDocument(fileSystemManager, JSON);
+                        FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
 
                         byte[] bytes = fileSystemManager.readFile(fileDescriptor.md5, position, length).array();
                         String content = Base64.getEncoder().encodeToString(bytes);
@@ -417,7 +440,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A file bytes response was received from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
-                        FileDescriptor fileDescriptor = Protocol.createFileDesctiptorFromDocument(fileSystemManager, JSON);
+                        FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
                         long length = JSON.getLong("length");
                         long position = JSON.getLong("position");
 
@@ -450,7 +473,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A file delete request was received from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
-                        FileDescriptor fileDescriptor = Protocol.createFileDesctiptorFromDocument(fileSystemManager, JSON);
+                        FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
 
                         if (!fileSystemManager.isSafePathName(pathName)) {
                             String errorString = "Path name is unsafe: File delete request failed";
@@ -504,7 +527,7 @@ public class ServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A file modify request was received from " + clientHostPort.toString());
 
                         String pathName = JSON.getString("pathName");
-                        FileDescriptor fileDescriptor = Protocol.createFileDesctiptorFromDocument(fileSystemManager, JSON);
+                        FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
 
                          if (!fileSystemManager.isSafePathName(pathName)) {
                             String errorString = "Path name is unsafe: File modify request failed";
