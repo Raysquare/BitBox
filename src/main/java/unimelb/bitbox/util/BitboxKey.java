@@ -179,10 +179,10 @@ public class BitboxKey {
     }
 
 
-    public static PrivateKey getPrivateKey(String filename)
+    public static PrivateKey getPrivateKey(String path)
             throws Exception {
 
-        byte[] keyBytes = Files.readAllBytes(Paths.get(filename));
+        byte[] keyBytes = Files.readAllBytes(Paths.get(path));
 
         PKCS8EncodedKeySpec spec =
                 new PKCS8EncodedKeySpec(keyBytes);
@@ -240,7 +240,7 @@ public class BitboxKey {
         // Generating AES 128 secret key
         SecretKey secretKey = generateSecretKey();
         String encodedKey = KeyEncodedString(secretKey);
-        System.out.println("the original secret key: "+encodedKey);
+        System.out.println("the original secret key: \n"+encodedKey);
 
         // A string of public key convert to Java public key class
         String pubkeystr = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDWn4S24nw8FGKz7uqSxvOifmYbESoDHualRCBhmU+uzluaYXOr56+1i72A6SiJy4uRtVbrTYWxLLaaPk16mzgDdCWBuMh4oqb1wWV3gnfixLfJeDax6XxpzGN4Gmpk6ErCNtbLw9njW4N6brNv7O0hkvDWUTmjlB0cRKQhCXvfifdXD8HW2A4cOeRFU+vdRVVHGAlEz4ZIQ4/hFEGnLX+ccAUXUPr6cTn6NCpNUmib+SSSm581W10iB8HaIwxyxzhaPiXhEMvY0LtEUw+FhQHvfexnhyi/2zVMs1So3eZQZsUKcXjV3qHq7f7T0PPskXmg1boRW7AHTohalsXJBwvN raydevil@xiruideMacBook-Pro.local";
@@ -251,23 +251,22 @@ public class BitboxKey {
         // Encrypting our secret key
         byte[] encrpytedkey = EncryptSecretKey(pubkey,secretKey);
         String encryptedkeystr = Base64.getEncoder().encodeToString(encrpytedkey);
-        System.out.println("the encrypted key: "+encryptedkeystr);
+        System.out.println("the encrypted key: \n"+encryptedkeystr);
 
         // A der file of private key convert to Java private key class
         PrivateKey prikey =getPrivateKey("keyfiles/private_key.der");
         String prikeyencoded = KeyEncodedString(prikey);
-        System.out.println("the private key: "+prikeyencoded);
+        System.out.println("the private key: \n"+prikeyencoded);
 
         // Decrypting our secret key
         SecretKey newSecretKey = DecryptSecretKey(encrpytedkey,prikey);
         String newSecretkeyEncoded = KeyEncodedString(newSecretKey);
-        System.out.println("the decrypted secret key: "+newSecretkeyEncoded);
-
+        System.out.println("the decrypted secret key: \n"+newSecretkeyEncoded);
 
 
         // Example for how to encrypt and decrypt message
         System.out.println("\nExample:");
-        String original_str = "h";
+        String original_str = "hello world";
         System.out.println("Original message is "+original_str);
         String encrypted_str = AES_Encryption(original_str,secretKey);
         System.out.println("Encrypted message is "+encrypted_str);
