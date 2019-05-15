@@ -127,12 +127,12 @@ public class BitboxKey {
 
     public static SecretKey DecryptSecretKey(byte[] content, PrivateKey privateKey) {
         SecretKey key = null;
-        try {
+        try
+        {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipher.init(Cipher.DECRYPT_MODE, privateKey);
             key = new SecretKeySpec( cipher.doFinal(content), "AES" );
             return key;
-
         } catch (Exception e){
             e.printStackTrace();
             return null;
@@ -145,7 +145,6 @@ public class BitboxKey {
             Cipher cipher = Cipher.getInstance("AES/ECB/ISO10126Padding");
             cipher.init(Cipher.ENCRYPT_MODE, secretKey);
             return Base64.getEncoder().encodeToString(cipher.doFinal(original_str.getBytes("UTF-8")));
-
         }
         catch (Exception e){
             e.printStackTrace();
