@@ -29,7 +29,9 @@ import static com.google.common.io.BaseEncoding.base64;
 
 /**
  * There is an example in the Main class (at the bottom)
- * Just have a look then. Talk to me if you have any problems with everything
+ * You can run this java by :
+ * java -cp target/bitbox-0.0.1-SNAPSHOT-jar-with-dependencies.jar unimelb.bitbox.util.BitboxKey
+ * Just have a look then. Talk to me if you have any problems.
  * Ray
  */
 
