@@ -56,21 +56,18 @@ public class BitboxKey {
         this.supplier = ByteSource.wrap(data);
     }
 
-
     public static PublicKey StringToPublicKey (String keyString) throws Exception{
-        byte[] pubkeybyte = keyString.getBytes();
-        RSAPublicKeySpec spec = new BitboxKey(pubkeybyte).convertToRSAPublicKey();
-        KeyFactory kf = null;
-        kf = KeyFactory.getInstance("RSA");
-        return kf.generatePublic(spec);
+        byte[] publicKeyBytes = keyString.getBytes();
+        RSAPublicKeySpec spec = new BitboxKey(publicKeyBytes).convertToRSAPublicKey();
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePublic(spec);
     }
 
     public static PublicKey FileToPublicKey (String path) throws Exception{
         File keyFile = new File(path);
         RSAPublicKeySpec spec = new BitboxKey(keyFile).convertToRSAPublicKey();
-        KeyFactory kf = null;
-        kf = KeyFactory.getInstance("RSA");
-        return kf.generatePublic(spec);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePublic(spec);
     }
 
     public static String  KeyEncodedString (SecretKey key) {
@@ -86,22 +83,22 @@ public class BitboxKey {
     }
 
     public static SecretKey generateSecretKey() {
-        KeyGenerator keyGen = null;
+        KeyGenerator keyGenerator = null;
         try {
             /*
              * Get KeyGenerator object that generates secret keys for the
              * specified algorithm.
              */
-            keyGen = KeyGenerator.getInstance("AES");
+            keyGenerator = KeyGenerator.getInstance("AES");
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
 
         /* Initializes this key generator for key size to 256. */
-        keyGen.init(128);
+        keyGenerator.init(128);
 
         /* Generates a secret key */
-        SecretKey secretKey = keyGen.generateKey();
+        SecretKey secretKey = keyGenerator.generateKey();
 
         return secretKey;
     }
@@ -126,10 +123,6 @@ public class BitboxKey {
         return key;
     }
 
-
-
-
-
     public static SecretKey DecryptSecretKey(byte[] content, PrivateKey privateKey) {
         SecretKey key = null;
         try {
@@ -144,48 +137,44 @@ public class BitboxKey {
         }
     }
 
-
-
-
     public static String AES_Encryption (String original_str, SecretKey secretKey){
-
-        try{
+        try
+        {
             Cipher cipher = Cipher.getInstance("AES/ECB/ISO10126Padding");
             cipher.init(Cipher.ENCRYPT_MODE, secretKey);
             return Base64.getEncoder().encodeToString(cipher.doFinal(original_str.getBytes("UTF-8")));
 
-        }catch (Exception e){
+        }
+        catch (Exception e){
             e.printStackTrace();
             return null;
         }
-
     }
-
 
     public static String AES_Decryption (String original_str, SecretKey secretKey){
 
-        try{
+        try
+        {
             Cipher cipher = Cipher.getInstance("AES/ECB/ISO10126Padding");
             cipher.init(Cipher.DECRYPT_MODE, secretKey);
             return new String(cipher.doFinal(Base64.getDecoder().decode(original_str)));
 
-        }catch (Exception e){
+        }
+        catch (Exception e){
             e.printStackTrace();
             return null;
         }
 
     }
-
 
     public static PrivateKey getPrivateKey(String filename)
             throws Exception {
 
         byte[] keyBytes = Files.readAllBytes(Paths.get(filename));
 
-        PKCS8EncodedKeySpec spec =
-                new PKCS8EncodedKeySpec(keyBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        return kf.generatePrivate(spec);
+        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePrivate(spec);
     }
 
     /**
@@ -197,11 +186,11 @@ public class BitboxKey {
         try {
             InputStream stream = supplier.openStream();
             Iterable<String> parts = Splitter.on(' ').split(IOUtils.toString(stream, Charsets.UTF_8));
-            checkArgument(size(parts) >= 2 && SSH_MARKER.equals(get(parts,0)), "bad format, should be: ssh-rsa AAAB3....");
+            checkArgument(size(parts) >= 2 && SSH_MARKER.equals(get(parts,0)), "Bad format, should be: ssh-rsa AAAB3....");
             stream = new ByteArrayInputStream(base64().decode(get(parts, 1)));
             String marker = new String(readLengthFirst(stream));
 
-            checkArgument(SSH_MARKER.equals(marker), "looking for marker %s but received %s", SSH_MARKER, marker);
+            checkArgument(SSH_MARKER.equals(marker), "Looking for marker %s but received %s", SSH_MARKER, marker);
             BigInteger publicExponent = new BigInteger(readLengthFirst(stream));
             BigInteger modulus = new BigInteger(readLengthFirst(stream));
             RSAPublicKeySpec keySpec = new RSAPublicKeySpec(modulus, publicExponent);
@@ -225,7 +214,6 @@ public class BitboxKey {
         return val;
 
     }
-
 
     /**
      * This main function is showing an example how to use this java file.
@@ -261,8 +249,6 @@ public class BitboxKey {
         String newSecretkeyEncoded = KeyEncodedString(newSecretKey);
         System.out.println("the decrypted secret key: "+newSecretkeyEncoded);
 
-
-
         // Example for how to encrypt and decrypt message
         System.out.println("\nExample:");
         String original_str = "h";
@@ -271,9 +257,5 @@ public class BitboxKey {
         System.out.println("Encrypted message is "+encrypted_str);
         String decrypted_str = AES_Decryption(encrypted_str,secretKey);
         System.out.println("Decrypted message is "+ decrypted_str);
-
     }
-
-
-
 }
