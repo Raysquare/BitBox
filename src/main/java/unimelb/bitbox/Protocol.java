@@ -104,6 +104,51 @@ public class Protocol {
             case "DIRECTORY_CREATE_RESPONSE":
             case "DIRECTORY_DELETE_RESPONSE":
                 return (message.containsKey("pathName") && message.containsKey("message") && message.containsKey("status"));
+
+            case "AUTH_REQUEST":
+                return message.containsKey("identity");
+            case "AUTH_RESPONSE":
+                return (message.containsKey("AES128") && message.containsKey("status") && message.containsKey("message"));
+
+            case "LIST_PEERS_REQUEST":
+            case "LIST_PEERS_RESPONSE":
+                if (message.containsKey("peers")) {
+                    for (Document peer : (ArrayList<Document>)message.get("peers")) {
+                        if (!peer.containsKey("host") || !peer.containsKey("port"))
+                            return false;
+                    }
+                    return true;
+                }
+                return false;
+
+            case "CONNECT_PEER_REQUEST":
+                if (message.containsKey("hostPort")) {
+                    Document hostPort = (Document)message.get("hostPort");
+                    return hostPort.containsKey("host") && hostPort.containsKey("port");
+                }
+                return false;
+
+            case "CONNECT_PEER_RESPONSE":
+                if (message.containsKey("hostPort") && message.containsKey("status") && message.containsKey("message")) {
+                    Document hostPort = (Document)message.get("hostPort");
+                    return hostPort.containsKey("host") && hostPort.containsKey("port");
+                }
+                return false;
+
+            case "DISCONNECT_PEER_REQUEST":
+                if (message.containsKey("hostPort")) {
+                    Document hostPort = (Document)message.get("hostPort");
+                    return hostPort.containsKey("host") && hostPort.containsKey("port");
+                }
+                return false;
+
+            case "DISCONNECT_PEER_RESPONSE":
+                if (message.containsKey("hostPort") && message.containsKey("status") && message.containsKey("message")) {
+                    Document hostPort = (Document)message.get("hostPort");
+                    return hostPort.containsKey("host") && hostPort.containsKey("port");
+                }
+                return false;
+
         }
 
         return false;
