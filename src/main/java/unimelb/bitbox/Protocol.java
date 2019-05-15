@@ -5,6 +5,7 @@ import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 import unimelb.bitbox.util.HostPort;
 
+import javax.print.Doc;
 import java.util.ArrayList;
 
 public class Protocol {
@@ -302,4 +303,102 @@ public class Protocol {
 
         return fileSystemManager.new FileDescriptor(lastModified, md5, fileSize);
     }
+
+    public static Document createAuthorizationRequest(String identity)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "AUTH_REQUEST");
+        JSON.append("identity", identity);
+
+        return JSON;
+    }
+
+    public static Document createAuthorizationResponse(String secretKey, boolean status, String message)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "AUTH_RESPONSE");
+        JSON.append("AES128", secretKey);
+        JSON.append("status", status);
+        JSON.append("message", message);
+
+        return JSON;
+    }
+
+    public static Document createPayload(String encryptedMessage)
+    {
+        Document JSON = new Document();
+
+        JSON.append("payload", encryptedMessage);
+
+        return JSON;
+    }
+
+    public static Document createListPeerRequest()
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "LIST_PEERS_REQUEST");
+
+        return JSON;
+    }
+
+    public static Document createListPeerResponse(ArrayList<Document> peers)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "LIST_PEERS_RESPONSE");
+        JSON.append("peers", peers);
+
+        return JSON;
+    }
+
+    public static Document createConnectPeerRequest(HostPort host)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "CONNECT_PEER_REQUEST");
+        JSON.append("hostPort", host.toDoc());
+
+        return JSON;
+    }
+
+    public static Document createConnectPeerResponse(HostPort host, boolean status, String message)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "CONNECT_PEER_RESPONSE");
+        JSON.append("hostPort", host.toDoc());
+        JSON.append("status", status);
+        JSON.append("message", message);
+
+        return JSON;
+    }
+
+    public static Document createDisconnectPeerRequest(HostPort host)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "DISCONNECT_PEER_REQUEST");
+        JSON.append("hostPort", host.toDoc());
+
+        return JSON;
+    }
+
+    public static Document createDisconnectPeerResponse(HostPort host, boolean status, String message)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "DISCONNECT_PEER_RESPONSE");
+        JSON.append("hostPort", host.toDoc());
+        JSON.append("status", status);
+        JSON.append("message", message);
+
+        return JSON;
+    }
 }
+
+
+
+
