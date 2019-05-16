@@ -14,6 +14,9 @@ public class CommandLineArgument {
     @Option(name = "-p", usage="Peer")
     public String peer;
 
+    @Option(name = "-i", usage="Identity")
+    public String identity;
+
     public String getCommand() {
         return command;
     }
@@ -26,6 +29,11 @@ public class CommandLineArgument {
         return peer;
     }
 
+    public String getIdentity() {
+        return identity;
+    }
+
+    //Just for testing
     public static void main(String[] args) {
         for (int index = 0 ; index < args.length; index ++)
             System.out.println(args[index]);
