@@ -1,5 +1,8 @@
 package unimelb.bitbox;
 
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import unimelb.bitbox.util.CommandLineArgument;
 import unimelb.bitbox.util.Configuration;
 import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.HostPort;
@@ -16,9 +19,8 @@ public class Client {
     private static final Logger log = Logger.getLogger(Client.class.getName());
 
     public Client() throws IOException {
-        String hostAddress = Configuration.getConfigurationValue("advertisedName");
-        localHost = new HostPort(hostAddress, Integer.parseInt(Configuration.getConfigurationValue("port")));
         socket = null;
+
 
     }
 
@@ -82,6 +84,30 @@ public class Client {
     }
 
     public static void main(String[] args) throws IOException {
+
+        CommandLineArgument commandLineArgument = new CommandLineArgument();
+
+        //Parser provided by args4j
+        CmdLineParser parser = new CmdLineParser(commandLineArgument);
+        try {
+
+            //Parse the arguments
+            parser.parseArgument(args);
+
+            //After parsing, the fields in argsBean have been updated with the given
+            //command line arguments
+            System.out.println("Command: " + commandLineArgument.getCommand());
+            System.out.println("Server: " + commandLineArgument.getServer());
+            System.out.println("Peer: " + commandLineArgument.getPeer());
+
+        } catch (CmdLineException e) {
+
+            System.err.println(e.getMessage());
+
+            //Print the usage to help the user understand the arguments expected
+            //by the program
+            parser.printUsage(System.err);
+        }
 
         new Client().start();
     }

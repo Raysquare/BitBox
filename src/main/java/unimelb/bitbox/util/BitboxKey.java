@@ -251,7 +251,6 @@ public class BitboxKey {
         String newSecretkeyEncoded = KeyEncodedString(newSecretKey);
         System.out.println("the decrypted secret key: \n"+newSecretkeyEncoded);
 
-
         // Example for how to encrypt and decrypt message
         System.out.println("\nExample:");
         String original_str = "hello world";
