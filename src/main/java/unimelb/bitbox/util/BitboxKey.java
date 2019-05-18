@@ -2,10 +2,13 @@ package unimelb.bitbox.util;
 
 import java.io.*;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 
@@ -169,14 +172,69 @@ public class BitboxKey {
     }
 
 
-    public static PrivateKey getPrivateKey(String path)
-            throws Exception {
+    public static PrivateKey getPrivateKey(String path) throws Exception {
+        KeyFactory factory = KeyFactory.getInstance("RSA");
+        File initialFile = new File(path);
+        InputStream targetStream = new FileInputStream(initialFile);
+        RSAPrivateCrtKeySpec pvtspec = decodeRSAPrivatePKCS1(readAllBase64Bytes(targetStream));
+        return factory.generatePrivate(pvtspec);
 
-        byte[] keyBytes = Files.readAllBytes(Paths.get(path));
+    }
 
-        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        return keyFactory.generatePrivate(spec);
+    /**
+     * Converts an openSSH private key to a PKCS#1 standard RSA private key spec
+     * Source: https://stackoverflow.com/questions/19365940/convert-openssh-rsa-key-to-javax-crypto-cipher-compatible-format
+     * @param encoded byte decoded from input stream
+     * @return RSAPrivateCrtKeySpec
+     */
+    private static RSAPrivateCrtKeySpec decodeRSAPrivatePKCS1(byte[] encoded) {
+        ByteBuffer input = ByteBuffer.wrap(encoded);
+        if (der(input, 0x30) != input.remaining()) throw new IllegalArgumentException("Excess data");
+        if (!BigInteger.ZERO.equals(derint(input))) throw new IllegalArgumentException("Unsupported version");
+        BigInteger n = derint(input);
+        BigInteger e = derint(input);
+        BigInteger d = derint(input);
+        BigInteger p = derint(input);
+        BigInteger q = derint(input);
+        BigInteger ep = derint(input);
+        BigInteger eq = derint(input);
+        BigInteger c = derint(input);
+        return new RSAPrivateCrtKeySpec(n, e, d, p, q, ep, eq, c);
+    }
+
+    private static BigInteger derint(ByteBuffer input) {
+        int len = der(input, 0x02);
+        byte[] value = new byte[len];
+        input.get(value);
+        return new BigInteger(+1, value);
+    }
+
+    private static int der(ByteBuffer input, int exp) {
+        int tag = input.get() & 0xFF;
+        if (tag != exp) throw new IllegalArgumentException("Unexpected tag");
+        int n = input.get() & 0xFF;
+        if (n < 128) return n;
+        n &= 0x7F;
+        if ((n < 1) || (n > 2)) throw new IllegalArgumentException("Invalid length");
+        int len = 0;
+        while (n-- > 0) {
+            len <<= 8;
+            len |= input.get() & 0xFF;
+        }
+        return len;
+    }
+
+    private static byte[] readAllBase64Bytes(InputStream input) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        BufferedReader r = new BufferedReader(new InputStreamReader(input, StandardCharsets.US_ASCII));
+        Base64.Decoder decoder = Base64.getDecoder();
+        while (true) {
+            String line = r.readLine();
+            if (line == null) break;
+            if (line.startsWith("-----")) continue;
+            output.write(decoder.decode(line));
+        }
+        return output.toByteArray();
     }
 
     /**
@@ -220,8 +278,7 @@ public class BitboxKey {
     /**
      * This main function is showing an example how to use this java file.
      * We will delete it after finishing other parts
-     * @param args
-     * @throws Exception
+     * @param args none
      */
     public static void main(String args[]) throws Exception {
 
@@ -234,7 +291,7 @@ public class BitboxKey {
         String pubkeystr = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDWn4S24nw8FGKz7uqSxvOifmYbESoDHualRCBhmU+uzluaYXOr56+1i72A6SiJy4uRtVbrTYWxLLaaPk16mzgDdCWBuMh4oqb1wWV3gnfixLfJeDax6XxpzGN4Gmpk6ErCNtbLw9njW4N6brNv7O0hkvDWUTmjlB0cRKQhCXvfifdXD8HW2A4cOeRFU+vdRVVHGAlEz4ZIQ4/hFEGnLX+ccAUXUPr6cTn6NCpNUmib+SSSm581W10iB8HaIwxyxzhaPiXhEMvY0LtEUw+FhQHvfexnhyi/2zVMs1So3eZQZsUKcXjV3qHq7f7T0PPskXmg1boRW7AHTohalsXJBwvN raydevil@xiruideMacBook-Pro.local";
         PublicKey pubkey = StringToPublicKey(pubkeystr);
         String pubkeyencoded = KeyEncodedString(pubkey);
-        System.out.println("the public key: "+pubkeyencoded);
+        System.out.println("the public key: \n"+pubkeyencoded);
 
         // Encrypting our secret key
         byte[] encrpytedkey = EncryptSecretKey(pubkey,secretKey);
@@ -242,7 +299,7 @@ public class BitboxKey {
         System.out.println("the encrypted key: \n"+encryptedkeystr);
 
         // A der file of private key convert to Java private key class
-        PrivateKey prikey =getPrivateKey("keyfiles/private_key.der");
+        PrivateKey prikey =getPrivateKey("keyfiles/jajaja_privatekey");
         String prikeyencoded = KeyEncodedString(prikey);
         System.out.println("the private key: \n"+prikeyencoded);
 
