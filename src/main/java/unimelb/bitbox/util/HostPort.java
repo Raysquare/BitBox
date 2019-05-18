@@ -41,5 +41,9 @@ public class HostPort {
         } 
         HostPort c = (HostPort) o;   
         return host.equals(c.host) && port==c.port; 
-    } 
+    }
+
+    public int hashCode() {
+		return toString().hashCode();
+	}
 }
