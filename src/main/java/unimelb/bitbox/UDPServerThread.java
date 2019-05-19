@@ -223,12 +223,6 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                         Document hostPort = (Document)JSON.get("hostPort");
                         clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
 
-                        if (!clientHostPort.equals(clientSideServerHostPort)) {
-                            localPeer.removeFromConnectedPeers(clientHostPort);
-                            localPeer.addNewPeer(clientSideServerHostPort, this);
-                            clientHostPort = clientSideServerHostPort;
-                        }
-
                         if (localPeer.hasReachedMaxConnections()) {
                             String errorString = "The maximum connections has been reached";
                             String errorMsg = Protocol.createConnectionRefused(errorString, localPeer.getConnectedPeerHostPort(clientSideServerHostPort)).toJson();
@@ -263,14 +257,7 @@ public class UDPServerThread extends Thread implements FileSystemObserver
 
                         log.info("[LocalPeer] A handshake response was received from " + clientHostPort.toString());
 
-                        Document hostPort = (Document)JSON.get("hostPort");
-                        clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
-
-                        if (!clientHostPort.equals(clientSideServerHostPort)) {
-                            localPeer.removeFromConnectedPeers(clientHostPort);
-                            localPeer.addNewPeer(clientSideServerHostPort, this);
-                            clientHostPort = clientSideServerHostPort;
-                        }
+                        clientSideServerHostPort = clientHostPort;
 
                         handshakeCompleted = true;
                         peerCandidates.clear();
@@ -429,7 +416,7 @@ public class UDPServerThread extends Thread implements FileSystemObserver
 
                         String pathName = JSON.getString("pathName");
                         long position = JSON.getLong("position");
-                        long length = JSON.getLong("length");
+                        long length = Math.min(JSON.getLong("length"), localPeer.blockSize);
                         FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
 
                         byte[] bytes = fileSystemManager.readFile(fileDescriptor.md5, position, length).array();

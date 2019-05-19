@@ -110,7 +110,7 @@ public class Protocol {
 
             case "AUTH_REQUEST":
                 return message.containsKey("identity");
-                
+
             case "AUTH_RESPONSE":
                 return (message.containsKey("AES128") && message.containsKey("status") && message.containsKey("message"));
 
