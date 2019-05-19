@@ -223,6 +223,12 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                         Document hostPort = (Document)JSON.get("hostPort");
                         clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
 
+                        if (!clientHostPort.equals(clientSideServerHostPort)) {
+                            localPeer.removeFromConnectedPeers(clientHostPort);
+                            localPeer.addNewPeer(clientSideServerHostPort, this);
+                            clientHostPort = clientSideServerHostPort;
+                        }
+
                         if (localPeer.hasReachedMaxConnections()) {
                             String errorString = "The maximum connections has been reached";
                             String errorMsg = Protocol.createConnectionRefused(errorString, localPeer.getConnectedPeerHostPort(clientSideServerHostPort)).toJson();
@@ -257,7 +263,15 @@ public class UDPServerThread extends Thread implements FileSystemObserver
 
                         log.info("[LocalPeer] A handshake response was received from " + clientHostPort.toString());
 
-                        clientSideServerHostPort = clientHostPort;
+                        Document hostPort = (Document)JSON.get("hostPort");
+                        clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
+
+                        if (!clientHostPort.equals(clientSideServerHostPort)) {
+                            localPeer.removeFromConnectedPeers(clientHostPort);
+                            localPeer.addNewPeer(clientSideServerHostPort, this);
+                            clientHostPort = clientSideServerHostPort;
+                        }
+
                         handshakeCompleted = true;
                         peerCandidates.clear();
 
