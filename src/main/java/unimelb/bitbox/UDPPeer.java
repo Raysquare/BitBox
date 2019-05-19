@@ -47,7 +47,7 @@ public class UDPPeer implements FileSystemObserver
         */
 
         String hostAddress = Configuration.getConfigurationValue("advertisedName").trim();
-        localHost = new HostPort(hostAddress, Integer.parseInt(Configuration.getConfigurationValue("port").trim()));
+        localHost = new HostPort(hostAddress, Integer.parseInt(Configuration.getConfigurationValue("udpPort").trim()));
     }
 
     /*
