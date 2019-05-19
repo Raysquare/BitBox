@@ -306,56 +306,56 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                         String pathName = JSON.getString("pathName");
                         FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
 
-                        if (!fileSystemManager.isSafePathName(pathName)) {
-                            String errorString = "Path name is unsafe: File create request failed";
-                            String errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false).toJson();
-
-                            sendPacket(errorMsg);
-
-                            log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
-                            log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
-                            log.info(errorMsg);
-
-                            // if the file with the same content exists, then reject the request
-                        } else if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
-                            String errorString = "File with the same content has existed: File create request failed";
-                            String errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false).toJson();
-
-                            sendPacket(errorMsg);
-
-                            log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
-                            log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
-                            log.info(errorMsg);
-
-                            // if the file exists but with different content, then try to modify it
-                        } else if (fileSystemManager.fileNameExists(pathName)) {
-
-                            // if the file is newer, then reject the request, otherwise overwrite the current older file
-                            if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified)) {
-                                String errorString = "There is a newer version: File create request failed";
+                        try {
+                            if (!fileSystemManager.isSafePathName(pathName)) {
+                                String errorString = "Path name is unsafe: File create request failed";
                                 String errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false).toJson();
 
                                 sendPacket(errorMsg);
 
-                                log.info("[LocalPeer] There is a newer version, refused request from " + clientHostPort.toString());
+                                log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
                                 log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
                                 log.info(errorMsg);
 
-                            } else {
-                                String messageString = "Overwrite the older version";
-                                String message = Protocol.createFileCreateResponse(fileDescriptor, pathName, messageString, true).toJson();
+                                // if the file with the same content exists, then reject the request
+                            } else if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
+                                String errorString = "File with the same content has existed: File create request failed";
+                                String errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false).toJson();
 
-                                sendPacket(message);
+                                sendPacket(errorMsg);
 
-                                log.info("[LocalPeer] Overwrite the older version and get a new one from " + clientHostPort.toString());
+                                log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
                                 log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
-                                log.info(message);
+                                log.info(errorMsg);
 
-                                sendFileBytesRequest(fileDescriptor, pathName, 0, fileDescriptor.fileSize);
-                            }
+                                // if the file exists but with different content, then try to modify it
+                            } else if (fileSystemManager.fileNameExists(pathName)) {
 
-                        } else {
-                            try {
+                                // if the file is newer, then reject the request, otherwise overwrite the current older file
+                                if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified)) {
+                                    String errorString = "There is a newer version: File create request failed";
+                                    String errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false).toJson();
+
+                                    sendPacket(errorMsg);
+
+                                    log.info("[LocalPeer] There is a newer version, refused request from " + clientHostPort.toString());
+                                    log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
+                                    log.info(errorMsg);
+
+                                } else {
+                                    String messageString = "Overwrite the older version";
+                                    String message = Protocol.createFileCreateResponse(fileDescriptor, pathName, messageString, true).toJson();
+
+                                    sendPacket(message);
+
+                                    log.info("[LocalPeer] Overwrite the older version and get a new one from " + clientHostPort.toString());
+                                    log.info("[LocalPeer] Sent FILE_CREATE_RESPONSE to " + clientHostPort.toString());
+                                    log.info(message);
+
+                                    sendFileBytesRequest(fileDescriptor, pathName, 0, fileDescriptor.fileSize);
+                                }
+
+                            } else {
                                 fileSystemManager.createFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified);
 
                                 // if there is a file with a different name but the same content, then reject the request, otherwise then the request is accepted
@@ -378,13 +378,14 @@ public class UDPServerThread extends Thread implements FileSystemObserver
 
                                 sendFileBytesRequest(fileDescriptor, pathName, 0, fileDescriptor.fileSize);
 
-                            } catch (IOException e) {
-                                String errorString = "Cannot create the file loader as it has already been created";
-                                log.info("[LocalPeer] Cannot create the file loader, refused request from " + clientHostPort.toString());
-                                String errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false).toJson();
-
-                                sendPacket(errorMsg);
                             }
+
+                        } catch (IOException e) {
+                            String errorString = "Cannot create the file loader as it has already been created";
+                            log.info("[LocalPeer] Cannot create the file loader, refused request from " + clientHostPort.toString());
+                            String errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false).toJson();
+
+                            sendPacket(errorMsg);
                         }
 
                         break;
@@ -530,46 +531,55 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                         String pathName = JSON.getString("pathName");
                         FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
 
-                         if (!fileSystemManager.isSafePathName(pathName)) {
-                            String errorString = "Path name is unsafe: File modify request failed";
-                            String errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false).toJson();
+                        try {
+                            if (!fileSystemManager.isSafePathName(pathName)) {
+                                String errorString = "Path name is unsafe: File modify request failed";
+                                String errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false).toJson();
+
+                                sendPacket(errorMsg);
+
+                                log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
+                                log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
+                                log.info(errorMsg);
+
+                            } else if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
+                                String errorString = "File with the same content has existed: File modify request failed";
+                                String errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false).toJson();
+
+                                sendPacket(errorMsg);
+
+                                log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
+                                log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
+                                log.info(errorMsg);
+
+                            } else if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified)) {
+                                String errorString = "File doesn't exist: File modify request failed";
+                                String errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false).toJson();
+
+                                sendPacket(errorMsg);
+
+                                log.info("[LocalPeer] File name has existed, refused request from " + clientHostPort.toString());
+                                log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
+                                log.info(errorMsg);
+
+                            } else {
+                                String messageString = "Modify file loader ready";
+                                String fileModifyMessage = Protocol.createFileModifyResponse(fileDescriptor, pathName, messageString, true).toJson();
+
+                                sendPacket(fileModifyMessage);
+
+                                log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
+                                log.info(fileModifyMessage);
+
+                                sendFileBytesRequest(fileDescriptor, pathName, 0, fileDescriptor.fileSize);
+                            }
+
+                        } catch (IOException e) {
+                            String errorString = "Cannot modify file loader as it has already been created";
+                            log.info("[LocalPeer] Cannot modify the file loader, refused request from " + clientHostPort.toString());
+                            String errorMsg = Protocol.createFileCreateResponse(fileDescriptor, pathName, errorString, false).toJson();
 
                             sendPacket(errorMsg);
-
-                            log.info("[LocalPeer] Path name is unsafe, refused request from " + clientHostPort.toString());
-                            log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
-                            log.info(errorMsg);
-
-                        } else if (fileSystemManager.fileNameExists(pathName, fileDescriptor.md5)) {
-                            String errorString = "File with the same content has existed: File modify request failed";
-                            String errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false).toJson();
-
-                            sendPacket(errorMsg);
-
-                            log.info("[LocalPeer] File with the same content has existed, refused request from " + clientHostPort.toString());
-                            log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
-                            log.info(errorMsg);
-
-                        } else if (!fileSystemManager.modifyFileLoader(pathName, fileDescriptor.md5, fileDescriptor.fileSize, fileDescriptor.lastModified)) {
-                            String errorString = "File doesn't exist: File modify request failed";
-                            String errorMsg = Protocol.createFileModifyResponse(fileDescriptor, pathName, errorString, false).toJson();
-
-                            sendPacket(errorMsg);
-
-                            log.info("[LocalPeer] File name has existed, refused request from " + clientHostPort.toString());
-                            log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
-                            log.info(errorMsg);
-
-                        } else {
-                            String messageString = "Modify file loader ready";
-                            String fileModifyMessage = Protocol.createFileModifyResponse(fileDescriptor, pathName, messageString, true).toJson();
-
-                            sendPacket(fileModifyMessage);
-
-                            log.info("[LocalPeer] Sent FILE_MODIFY_RESPONSE to " + clientHostPort.toString());
-                            log.info(fileModifyMessage);
-
-                            sendFileBytesRequest(fileDescriptor, pathName, 0, fileDescriptor.fileSize);
                         }
 
                         break;
