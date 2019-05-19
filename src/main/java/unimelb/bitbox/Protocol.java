@@ -11,6 +11,9 @@ import java.util.ArrayList;
 public class Protocol {
     public static boolean isValid(Document message)
     {
+        if (!message.containsKey("command"))
+            return false;
+
         switch (message.getString("command")) {
             case "INVALID_PROTOCOL":
                 return message.containsKey("message");
@@ -107,6 +110,7 @@ public class Protocol {
 
             case "AUTH_REQUEST":
                 return message.containsKey("identity");
+                
             case "AUTH_RESPONSE":
                 return (message.containsKey("AES128") && message.containsKey("status") && message.containsKey("message"));
 
@@ -122,19 +126,6 @@ public class Protocol {
                 return false;
 
             case "CONNECT_PEER_REQUEST":
-                if (message.containsKey("hostPort")) {
-                    Document hostPort = (Document)message.get("hostPort");
-                    return hostPort.containsKey("host") && hostPort.containsKey("port");
-                }
-                return false;
-
-            case "CONNECT_PEER_RESPONSE":
-                if (message.containsKey("hostPort") && message.containsKey("status") && message.containsKey("message")) {
-                    Document hostPort = (Document)message.get("hostPort");
-                    return hostPort.containsKey("host") && hostPort.containsKey("port");
-                }
-                return false;
-
             case "DISCONNECT_PEER_REQUEST":
                 if (message.containsKey("hostPort")) {
                     Document hostPort = (Document)message.get("hostPort");
@@ -142,6 +133,7 @@ public class Protocol {
                 }
                 return false;
 
+            case "CONNECT_PEER_RESPONSE":
             case "DISCONNECT_PEER_RESPONSE":
                 if (message.containsKey("hostPort") && message.containsKey("status") && message.containsKey("message")) {
                     Document hostPort = (Document)message.get("hostPort");
