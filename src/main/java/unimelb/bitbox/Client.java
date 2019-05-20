@@ -124,7 +124,7 @@ public class Client {
             }
         } finally {
             if (socket != null)
-                socket.close();
+                socket.close()                                                           ;
         }
 
     }
@@ -134,14 +134,13 @@ public class Client {
         out.write(authorizationRequest.toJson());
         out.newLine();
         out.flush();
-        log.info("[Client] Sent a authorization request to " + serverHost.toString());
+        log.info("[Client] Sent an AUTH_REQUEST to " + serverHost.toString());
         log.info(authorizationRequest.toJson());
     }
 
     public static void main(String[] args) throws Exception {
 
         CommandLineArgument commandLineArgument = new CommandLineArgument();
-
         //Parser provided by args4j
         CmdLineParser parser = new CmdLineParser(commandLineArgument);
         try {
@@ -154,6 +153,10 @@ public class Client {
             String server = commandLineArgument.getServer();
             String peer = commandLineArgument.getPeer();
             String identity = commandLineArgument.getIdentity();
+
+            //ServerThread serverThread = new ServerThread();
+            //serverThread.start();
+
             new Client(command, server, peer, identity).start();
 
         } catch (CmdLineException e) {
