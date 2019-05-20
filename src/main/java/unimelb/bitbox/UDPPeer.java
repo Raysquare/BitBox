@@ -105,7 +105,7 @@ public class UDPPeer implements FileSystemObserver
         setTimerForGenerateSyncEvents();
 
         while (true) {
-            byte[] buffer = new byte[65536];
+            byte[] buffer = new byte[65527];
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
             socket.receive(packet);
