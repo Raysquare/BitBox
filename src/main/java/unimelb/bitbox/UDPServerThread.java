@@ -35,6 +35,7 @@ public class UDPServerThread extends Thread implements FileSystemObserver
     private HostPort clientHostPort; // the host port that is used by client to connect to the local peer
     public HostPort clientSideServerHostPort; // the server host port on the client side
     private Timer retryTimer;
+    private long lastimeGotResponseFromClient;
 
     private boolean handshakeCompleted;
     private LinkedList<HostPort> peerCandidates; // it is used to store peer list when receiving CONNECTION_REFUSED
@@ -47,15 +48,21 @@ public class UDPServerThread extends Thread implements FileSystemObserver
             long currentTime = new Date().getTime();
 
             if ((currentTime - retryRecord.timeStamp > localPeer.udpTimeout) &&
-                    (retryRecord.numRetried < localPeer.udpRetries)) {
+                ((retryRecord.numRetried < localPeer.udpRetries) ||
+                 (!packetQueue.isEmpty()))) {
 
-                retryRecord.numRetried++;
+                if (retryRecord.numRetried < localPeer.udpRetries)
+                    retryRecord.numRetried++;
+                else
+                    retryRecord.numRetried = 0;
+
                 retryRecord.timeStamp = currentTime;
                 sendPacket(request);
 
             } else if (retryRecord.numRetried >= localPeer.udpRetries) {
                 retryTimer.cancel();
                 this.interrupt();
+                log.info("[LocalPeer] Retry fail: " + request);
                 return;
             }
         });
@@ -271,6 +278,7 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                     // try to connect to peers in the peer list in BFS order
                     case "CONNECTION_REFUSED": {
                         log.info("[LocalPeer] A connection refused message was received from " + clientHostPort.toString());
+                        requestRecords.clear();
 
                         // get peers needed to try from the peer list
                         for (Document peer : (ArrayList<Document>)JSON.get("peers")) {
