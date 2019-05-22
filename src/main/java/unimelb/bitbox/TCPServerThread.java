@@ -19,13 +19,12 @@ import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 
-/*
-    Each connection will have a server thread associated with it.
- */
-public class ServerThread extends Thread implements FileSystemObserver
+
+// Each connection will have a server thread associated with it.
+public class TCPServerThread extends Thread implements FileSystemObserver
 {
-    private static final Logger log = Logger.getLogger(ServerThread.class.getName());
-    private Peer localPeer; // the delegate object to the Peer instance
+    private static final Logger log = Logger.getLogger(TCPServerThread.class.getName());
+    private TCPServer localPeer; // the delegate object to the Peer instance
     private Socket socket;
     private BufferedReader input;
     private BufferedWriter output;
@@ -33,7 +32,7 @@ public class ServerThread extends Thread implements FileSystemObserver
     private HostPort clientHostPort; // the host port that is used by client to connect to the local peer
     public HostPort clientSideServerHostPort; // the server host port on the client side
 
-    private boolean handshakeCompleted;
+    public boolean handshakeCompleted;
     private LinkedList<HostPort> peerCandidates; // it is used to store peer list when receiving CONNECTION_REFUSED
     private ConcurrentLinkedQueue<String> messageQueue;
 
@@ -70,10 +69,6 @@ public class ServerThread extends Thread implements FileSystemObserver
                     while (!messageQueue.isEmpty()) {
                         String message = messageQueue.poll();
 
-                        if (message == null) {
-                            continue;
-                        }
-
                         output.write(message);
                         output.newLine();
                         output.flush();
@@ -85,7 +80,7 @@ public class ServerThread extends Thread implements FileSystemObserver
         }
     }
 
-    public ServerThread(Peer localPeer, Socket socket, HostPort serverHostPort, HostPort clientHostPort) throws IOException
+    public TCPServerThread(TCPServer localPeer, Socket socket, HostPort serverHostPort, HostPort clientHostPort) throws IOException
     {
         handshakeCompleted = false;
         this.socket = socket;
@@ -96,8 +91,8 @@ public class ServerThread extends Thread implements FileSystemObserver
         input = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
 
-        peerCandidates = new LinkedList<HostPort>();
-        messageQueue = new ConcurrentLinkedQueue<String>();
+        peerCandidates = new LinkedList<>();
+        messageQueue = new ConcurrentLinkedQueue<>();
 
         senderThread = new SenderThread();
         senderThread.start();
@@ -130,52 +125,8 @@ public class ServerThread extends Thread implements FileSystemObserver
         if (!handshakeCompleted)
             return;
 
-        switch (fileSystemEvent.event) {
-            case FILE_CREATE:
-                Document message = Protocol.createFileCreateRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                messageQueue.offer(message.toJson());
-
-                log.info("[LocalPeer] A file create event was received");
-                log.info("[LocalPeer] Sent FILE_CREATE_REQUEST to " + clientHostPort.toString());
-                log.info(message.toJson());
-                break;
-
-            case FILE_DELETE:
-                message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                messageQueue.offer(message.toJson());
-
-                log.info("[LocalPeer] A file delete event was received");
-                log.info("[LocalPeer] Sent FILE_DELETE_REQUEST to " + clientHostPort.toString());
-                log.info(message.toJson());
-                break;
-
-            case FILE_MODIFY:
-                message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName);
-                messageQueue.offer(message.toJson());
-
-                log.info("[LocalPeer] A file modify event was received");
-                log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
-                log.info(message.toJson());
-                break;
-
-            case DIRECTORY_CREATE:
-                message = Protocol.createDirectoryCreateRequest(fileSystemEvent.pathName);
-                messageQueue.offer(message.toJson());
-
-                log.info("[LocalPeer] A directory create event was received");
-                log.info("[LocalPeer] Sent DIRECTORY_CREATE_REQUEST to " + clientHostPort.toString());
-                log.info(message.toJson());
-                break;
-
-            case DIRECTORY_DELETE:
-                message = Protocol.createDirectoryDeleteRequest(fileSystemEvent.pathName);
-                messageQueue.offer(message.toJson());
-
-                log.info("[LocalPeer] A directory delete event was received");
-                log.info("[LocalPeer] Sent DIRECTORY_DELETE_REQUEST to " + clientHostPort.toString());
-                log.info(message.toJson());
-                break;
-        }
+        Document message = localPeer.fileSystemEventHandler(fileSystemEvent, clientHostPort);
+        messageQueue.offer(message.toJson());
     }
 
     private void close()
@@ -198,7 +149,7 @@ public class ServerThread extends Thread implements FileSystemObserver
         FileSystemManager fileSystemManager = localPeer.fileSystemManager;
 
         try {
-            while (true) {
+            while (!isInterrupted()) {
                 Document JSON = Document.parse(input.readLine());
                 //log.info(JSON.toJson());
 

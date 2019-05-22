@@ -28,16 +28,15 @@ class RequestRecord {
  */
 public class UDPServerThread extends Thread implements FileSystemObserver
 {
-    private static final Logger log = Logger.getLogger(ServerThread.class.getName());
-    private UDPPeer localPeer; // the delegate object to the Peer instance
+    private static final Logger log = Logger.getLogger(UDPServerThread.class.getName());
+    private UDPServer localPeer; // the delegate object to the Peer instance
     private DatagramSocket socket;
     private HostPort serverHostPort;
     private HostPort clientHostPort; // the host port that is used by client to connect to the local peer
     public HostPort clientSideServerHostPort; // the server host port on the client side
     private Timer retryTimer;
-    private long lastimeGotResponseFromClient;
 
-    private boolean handshakeCompleted;
+    public boolean handshakeCompleted;
     private LinkedList<HostPort> peerCandidates; // it is used to store peer list when receiving CONNECTION_REFUSED
     public ConcurrentLinkedQueue<DatagramPacket> packetQueue;
     public ConcurrentHashMap<String, RequestRecord> requestRecords; // only stores retry records for requests sent by the local peer
@@ -60,15 +59,15 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                 sendPacket(request);
 
             } else if (retryRecord.numRetried >= localPeer.udpRetries) {
-                retryTimer.cancel();
-                this.interrupt();
+             //   retryTimer.cancel();
+             //   this.interrupt();
                 log.info("[LocalPeer] Retry fail: " + request);
                 return;
             }
         });
     }
 
-    public UDPServerThread(UDPPeer localPeer, DatagramSocket socket, HostPort serverHostPort, HostPort clientHostPort) throws IOException
+    public UDPServerThread(UDPServer localPeer, DatagramSocket socket, HostPort serverHostPort, HostPort clientHostPort)
     {
         handshakeCompleted = false;
         this.socket = socket;
@@ -76,9 +75,9 @@ public class UDPServerThread extends Thread implements FileSystemObserver
         this.serverHostPort = serverHostPort;
         this.clientHostPort = clientHostPort;
 
-        peerCandidates = new LinkedList<HostPort>();
-        packetQueue = new ConcurrentLinkedQueue<DatagramPacket>();
-        requestRecords = new ConcurrentHashMap<String, RequestRecord>();
+        peerCandidates = new LinkedList<>();
+        packetQueue = new ConcurrentLinkedQueue<>();
+        requestRecords = new ConcurrentHashMap<>();
 
         retryTimer = new Timer();
         retryTimer.scheduleAtFixedRate(new TimerTask() {
@@ -130,57 +129,9 @@ public class UDPServerThread extends Thread implements FileSystemObserver
         if (!handshakeCompleted)
             return;
 
-        switch (fileSystemEvent.event) {
-            case FILE_CREATE:
-                String message = Protocol.createFileCreateRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName).toJson();
-                sendPacket(message);
-                requestRecords.put(message, new RequestRecord(new Date().getTime(), 0));
-
-                log.info("[LocalPeer] A file create event was received");
-                log.info("[LocalPeer] Sent FILE_CREATE_REQUEST to " + clientHostPort.toString());
-                log.info(message);
-                break;
-
-            case FILE_DELETE:
-                message = Protocol.createFileDeleteRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName).toJson();
-                sendPacket(message);
-                requestRecords.put(message, new RequestRecord(new Date().getTime(), 0));
-
-                log.info("[LocalPeer] A file delete event was received");
-                log.info("[LocalPeer] Sent FILE_DELETE_REQUEST to " + clientHostPort.toString());
-                log.info(message);
-                break;
-
-            case FILE_MODIFY:
-                message = Protocol.createFileModifyRequest(fileSystemEvent.fileDescriptor, fileSystemEvent.pathName).toJson();
-                sendPacket(message);
-                requestRecords.put(message, new RequestRecord(new Date().getTime(), 0));
-
-                log.info("[LocalPeer] A file modify event was received");
-                log.info("[LocalPeer] Sent FILE_MODIFY_REQUEST to " + clientHostPort.toString());
-                log.info(message);
-                break;
-
-            case DIRECTORY_CREATE:
-                message = Protocol.createDirectoryCreateRequest(fileSystemEvent.pathName).toJson();
-                sendPacket(message);
-                requestRecords.put(message, new RequestRecord(new Date().getTime(), 0));
-
-                log.info("[LocalPeer] A directory create event was received");
-                log.info("[LocalPeer] Sent DIRECTORY_CREATE_REQUEST to " + clientHostPort.toString());
-                log.info(message);
-                break;
-
-            case DIRECTORY_DELETE:
-                message = Protocol.createDirectoryDeleteRequest(fileSystemEvent.pathName).toJson();
-                sendPacket(message);
-                requestRecords.put(message, new RequestRecord(new Date().getTime(), 0));
-
-                log.info("[LocalPeer] A directory delete event was received");
-                log.info("[LocalPeer] Sent DIRECTORY_DELETE_REQUEST to " + clientHostPort.toString());
-                log.info(message);
-                break;
-        }
+        String message = localPeer.fileSystemEventHandler(fileSystemEvent, clientHostPort).toJson();
+        sendPacket(message);
+        requestRecords.put(message, new RequestRecord(new Date().getTime(), 0));
     }
 
     /*
