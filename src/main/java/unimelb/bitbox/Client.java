@@ -89,8 +89,7 @@ public class Client {
                         if(JSON.getBoolean("status"))
                         {
                             String key = JSON.getString("AES128");
-                            byte[] byteKey =  Base64.getDecoder().decode(key);
-                            secretKey = BitboxKey.DecryptSecretKey(byteKey, privateKey);
+                            secretKey = BitboxKey.DecryptSecretKey(key, privateKey);
                             log.info("[Client] Authorization success" );
                         }
                         else
