@@ -19,7 +19,7 @@ public class Client {
 
     private Socket socket;
     private String command;
-    private HostPort serverHost;
+    public HostPort serverHost;
     private String peer;
     private String identity;
     private SecretKey secretKey;
@@ -27,12 +27,11 @@ public class Client {
     private static final Logger log = Logger.getLogger(Client.class.getName());
 
     public Client(String command, String server, String peer, String identity) throws Exception {
-        socket = null;
         this.command = command;
         this.serverHost = new HostPort(server);
         this.peer = peer;
         this.identity = identity;
-        privateKey = BitboxKey.getPrivateKey("keyfiles/private_key.der");
+        privateKey = BitboxKey.getPrivateKey("keyfiles/jajaja_privatekey");
     }
 
     public void start() throws IOException {
@@ -41,40 +40,12 @@ public class Client {
             BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
             BufferedWriter output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
             sendAuthorizationRequest(output);
-            if (command == "list_peers"){
-                log.info("[Client] Sending LIST_PEER_REQUEST to:" + serverHost.toString());
-                Document listPeerRequest = Protocol.createListPeerRequest();
-                String result = BitboxKey.AES_Encryption(listPeerRequest.toJson(), secretKey);
-                Document payload = Protocol.createPayload(result);
-                output.write(payload.toJson());
-                output.newLine();
-                output.flush();
-            }
-            if (command == "connect_peer"){
-                log.info("[Client] Sending CONNECT_PEER_REQUEST to:" + serverHost.toString());
-                Document connectPeerRequest = Protocol.createConnectPeerRequest(serverHost);
-                String result = BitboxKey.AES_Encryption(connectPeerRequest.toJson(), secretKey);
-                Document payload = Protocol.createPayload(result);
-                output.write(payload.toJson());
-                output.newLine();
-                output.flush();
-
-            }
-            if (command == "disconnect_peer"){
-                log.info("[Client] Sending DISCONNECT_PEER_REQUEST to:" + serverHost.toString());
-                Document disconnectPeerRequest = Protocol.createDisconnectPeerRequest(serverHost);
-                String result = BitboxKey.AES_Encryption(disconnectPeerRequest.toJson(), secretKey);
-                Document payload = Protocol.createPayload(result);
-                output.write(payload.toJson());
-                output.newLine();
-                output.flush();
-            }
 
             while (true) {
                 String message;
 
                 if (secretKey != null){
-                    message = BitboxKey.AES_Decryption(input.readLine(), secretKey);
+                    message = BitboxKey.AES_Decryption(Document.parse(input.readLine()).getString("payload"), secretKey);
                 }
                 else
                 {
@@ -89,15 +60,16 @@ public class Client {
                         if(JSON.getBoolean("status"))
                         {
                             String key = JSON.getString("AES128");
-                            byte[] byteKey =  Base64.getDecoder().decode(key);
-                            secretKey = BitboxKey.DecryptSecretKey(byteKey, privateKey);
+                            secretKey = BitboxKey.DecryptSecretKey(key, privateKey);
                             log.info("[Client] Authorization success" );
+                            processCommands(output);
+
                         }
                         else
                         {
                             log.info(String.format("[Client] Authorization fail because %s" ,JSON.getString("message")));
-                            return;
                         }
+                        break;
                     }
                     case "LIST_PEERS_RESPONSE": {
                         log.info("[Client] A list peers response was received from " + serverHost.toString());
@@ -105,19 +77,19 @@ public class Client {
 
                             log.info(String.format("[Client] The currently connected peer is %s: %s",
                                     peer.getString("host"),
-                                    peer.getInteger("port")));
+                                    peer.getLong("port")));
                         }
-                        break;
+                        return;
                     }
                     case "CONNECT_PEER_RESPONSE": {
                         log.info("[Client] A connect peer response was received from " + serverHost.toString());
-                        log.info(JSON.getString("message"));
-                        break;
+                        log.info(JSON.getString("mes sage"));
+                        return;
                     }
                     case "DISCONNECT_PEER_RESPONSE ": {
                         log.info("[Client] A disconnect peer response was received from " + serverHost.toString());
                         log.info(JSON.getString("message"));
-                        break;
+                        return;
                     }
 
                 }
@@ -127,6 +99,37 @@ public class Client {
                 socket.close()                                                           ;
         }
 
+    }
+
+    private void processCommands(BufferedWriter output) throws IOException {
+        if (command.equals("list_peers")){
+            log.info("[Client] Sending LIST_PEER_REQUEST to:" + serverHost.toString());
+            Document listPeerRequest = Protocol.createListPeerRequest();
+            String result = BitboxKey.AES_Encryption(listPeerRequest.toJson(), secretKey);
+            Document payload = Protocol.createPayload(result);
+            output.write(payload.toJson());
+            output.newLine();
+            output.flush();
+        }
+        else if (command.equals("connect_peer")){
+            log.info("[Client] Sending CONNECT_PEER_REQUEST to:" + serverHost.toString());
+            Document connectPeerRequest = Protocol.createConnectPeerRequest(new HostPort(peer));
+            String result = BitboxKey.AES_Encryption(connectPeerRequest.toJson(), secretKey);
+            Document payload = Protocol.createPayload(result);
+            output.write(payload.toJson());
+            output.newLine();
+            output.flush();
+
+        }
+        else if (command.equals("disconnect_peer")){
+            log.info("[Client] Sending DISCONNECT_PEER_REQUEST to:" + serverHost.toString());
+            Document disconnectPeerRequest = Protocol.createDisconnectPeerRequest(new HostPort(peer));
+            String result = BitboxKey.AES_Encryption(disconnectPeerRequest.toJson(), secretKey);
+            Document payload = Protocol.createPayload(result);
+            output.write(payload.toJson());
+            output.newLine();
+            output.flush();
+        }
     }
 
     private void sendAuthorizationRequest(BufferedWriter out) throws IOException {

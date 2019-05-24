@@ -55,6 +55,6 @@ public class CommandLineArgument {
 
     // Just for testing
     private void run() {
-        System.out.format("java -cp bitbox.jar unimelb.bitbox.Client -c %s -s %s -p %s\n", command, server, peer);
+        System.out.format("java -cp bitbox.jar unimelb.bitbox.Client -c %s -s %s -p %s -i %s\n", command, server, peer, identity);
     }
 }

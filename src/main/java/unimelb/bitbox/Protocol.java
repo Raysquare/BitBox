@@ -363,6 +363,16 @@ public class Protocol {
         return JSON;
     }
 
+    public static Document createAuthorizationResponse(boolean status, String message)
+    {
+        Document JSON = new Document();
+
+        JSON.append("command", "AUTH_RESPONSE");
+        JSON.append("status", status);
+        JSON.append("message", message);
+
+        return JSON;
+    }
     public static Document createPayload(String encryptedMessage)
     {
         Document JSON = new Document();

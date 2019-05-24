@@ -2,7 +2,11 @@ package unimelb.bitbox;
 
 import unimelb.bitbox.util.*;
 
+import javax.crypto.SecretKey;
+import javax.net.ServerSocketFactory;
+import javax.print.Doc;
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -16,167 +20,170 @@ import java.util.HashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 
-public class CommandServer extends Thread  {
+import static java.lang.Thread.sleep;
+import static unimelb.bitbox.Protocol.createAuthorizationResponse;
 
-    private Socket socket;
-    private HostPort clientHostPort;
-    private HostPort serverHostPort;
-    private int clientPort;
+public class CommandServer{
 
-    private ArrayList<String> connectedPeers;
-    private static final Logger log = Logger.getLogger(Peer.class.getName());
+    private Socket clientSocket;
+    private Server server;
+    private int localport;
+
+    private static final Logger log = Logger.getLogger(CommandServer.class.getName());
     private HashMap<String, String> keyIdentityList = new HashMap<String, String>();
-    private PublicKey publicKey;
-    private BufferedReader input;
-    private BufferedWriter output;
-    private ConcurrentLinkedQueue<String> messageQueue;
-    private CommandSenderThread senderThread;
+    private String publicKey;
+    private SecretKey secretKey;
     private String identity;
 
-    public CommandServer(Client client, Socket socket, HostPort serverHostPort, HostPort clientHostPort) throws IOException, NoSuchAlgorithmException
+    public CommandServer(Server peerServer)
     {
-        connectedPeers = new ArrayList<>();
-        clientPort = Integer.parseInt(Configuration.getConfigurationValue("clientPort").trim());
-        clientHostPort = clientHostPort;
-        serverHostPort = serverHostPort;
+        clientSocket = null;
+        server = peerServer;
+        localport = Integer.parseInt(Configuration.getConfigurationValue("clientPort"));
         String keys = Configuration.getConfigurationValue("authorized_keys");
         String[] splitKey = keys.split(",");
         createIdentities(splitKey);
-        //publicKey = BitboxKey.StringToPublicKey();
 
-        senderThread = new CommandSenderThread();
-        senderThread.start();
     }
 
     public void createIdentities(String[] splitKey){
         for (int index = 0; index < splitKey.length; index ++){
             String[] keyIdentity = splitKey[index].split(" ");
-            // I am not sure if the key is the whole text or just the 2 first texts until the identity
             String key = splitKey[index];
             String identity = keyIdentity[2];
             keyIdentityList.put(identity, key);
         }
     }
 
-    class CommandSenderThread extends Thread {
-        public void run() {
-            try {
-                while (!this.isInterrupted()) {
-                    String message = messageQueue.poll();
-
-                    if (message == null) {
-                        this.sleep(500);
-                        continue;
-                    }
-
-                    output.write(message);
-                    output.newLine();
-                    output.flush();
-                }
-
-            } catch (InterruptedException | SocketException e) {
-
-            } catch (IOException e) {
-
-            } finally {
-                // if the thread is interrupted, then sends the rest of outgoing messages
-                // to the corresponding peer
-                try {
-                    while (!messageQueue.isEmpty()) {
-                        String message = messageQueue.poll();
-
-                        if (message == null) {
-                            continue;
-                        }
-
-                        output.write(message);
-                        output.newLine();
-                        output.flush();
-                    }
-
-                } catch (SocketException e) {
-                } catch (IOException e) {}
-            }
+    public void start() throws IOException {
+        ServerSocketFactory factory = ServerSocketFactory.getDefault();
+        ServerSocket serverSocket = null;
+        try {
+            serverSocket = factory.createServerSocket(localport);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-    }
 
-    /*
-        This method process all the protocol commands.
-     */
-    public void run()
-    {
         try {
             while (true) {
-                Document JSON = Document.parse(input.readLine());
-                //log.info(JSON.toJson());
-                // TODO DECRYPTION
-                if (!Protocol.isValid(JSON)) {
-                    // I am not sure if INVALID PROTOCOL is applicable to project 2, I think it doesn't because it is not found in specs
+                clientSocket = serverSocket.accept();
+                boolean completed = false;
+                while (!completed) {
+                    String clientAddress = clientSocket.getInetAddress().getHostAddress();
+                    int clientPort = clientSocket.getPort();
+                    HostPort clientHost = new HostPort(clientAddress, clientPort);
+                    BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+                    BufferedWriter output = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
+                    String message;
 
-                    Document errorMsg = Protocol.createInvalidProtocol("Invalid protocol: the message misses required fields");
-                    messageQueue.offer(errorMsg.toJson());
+                    if (secretKey != null) {
+                        message = BitboxKey.AES_Decryption(Document.parse(input.readLine()).getString("payload"), secretKey);
+                    } else {
+                        message = input.readLine();
+                    }
 
-                    log.info("[Server] A message missing required fields was received from " + clientHostPort.toString());
-                    log.info("[Server] Sent INVALID_PROTOCOL to " + clientHostPort.toString());
-                    log.info(errorMsg.toJson());
-                    break;
+                    Document JSON = Document.parse(message);
+
+                    switch (JSON.getString("command")) {
+                        case "AUTH_REQUEST": {
+                            log.info("[CommandSever] A auth request was received from " + clientHost.toString());
+                            if (keyIdentityList.containsKey(JSON.getString("identity"))) {
+                                identity = JSON.getString("identity");
+                                publicKey = keyIdentityList.get(identity);
+                                secretKey = BitboxKey.generateSecretKey();
+                                String key = BitboxKey.EncryptSecretKey(BitboxKey.StringToPublicKey(publicKey), secretKey);
+                                Document authResponse = Protocol.createAuthorizationResponse(key, true, "public key found");
+                                output.write(authResponse.toJson());
+                                output.newLine();
+                                output.flush();
+                            } else {
+                                Document authResponse = Protocol.createAuthorizationResponse(false, "public key not found");
+                                output.write(authResponse.toJson());
+                                output.newLine();
+                                output.flush();
+                                log.info("[CommandServer] public key not found");
+                            }
+                            break;
+                        }
+                        case "LIST_PEERS_REQUEST": {
+                            log.info("[CommandServer] A LIST_PEERS_REQUEST was received from " + clientHost.toString());
+                            Document listPeerResponse = Protocol.createListPeerResponse(server.getConnectedPeerHostPort());
+                            String result = BitboxKey.AES_Encryption(listPeerResponse.toJson(), secretKey);
+                            Document payload = Protocol.createPayload(result);
+                            output.write(payload.toJson());
+                            output.newLine();
+                            output.flush();
+                            completed = true;
+                            secretKey = null;
+                            break;
+                        }
+                        case "CONNECT_PEER_REQUEST": {
+                            log.info("[CommandServer] A CONNECT_PEER_REQUEST was received from " + clientHost.toString());
+                            Document hostPort = (Document) JSON.get("hostPort");
+                            String host = hostPort.getString("host");
+                            int port = (int) hostPort.getLong("port");
+                            HostPort hostPortResponse = new HostPort(host, port);
+                            Document connectPeerResponse;
+                            server.addNewPeer(hostPortResponse.toString());
+                            sleep(5000);
+                            if (server.hasConnectedTo(host, port)) {
+                                connectPeerResponse = Protocol.createConnectPeerResponse(hostPortResponse, true, "connected to peer");
+                            } else {
+                                connectPeerResponse = Protocol.createConnectPeerResponse(hostPortResponse, false, "connection failed");
+                            }
+
+                            String result = BitboxKey.AES_Encryption(connectPeerResponse.toJson(), secretKey);
+                            Document payload = Protocol.createPayload(result);
+                            output.write(payload.toJson());
+                            output.newLine();
+                            output.flush();
+                            completed = true;
+                            secretKey = null;
+                            break;
+                        }
+                        case "DISCONNECT_PEER_REQUEST": {
+                            log.info("[CommandServer] A DISCONNECT_PEER_REQUEST was received from " + clientHost.toString());
+                            Document hostPort = (Document) JSON.get("hostPort");
+                            String host = hostPort.getString("host");
+                            Integer port = hostPort.getInteger("port");
+                            HostPort hostPortResponse = new HostPort(host, port);
+                            Document disconnectPeerResponse;
+                            server.removeFromConnectedPeers(hostPortResponse.toString());
+                            sleep(5000);
+                            if (server.hasConnectedTo(host, port)) {
+                                disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, true, "disconnected to peer");
+                            } else {
+                                disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, false, "connection still active");
+                            }
+
+                            String result = BitboxKey.AES_Encryption(disconnectPeerResponse.toJson(), secretKey);
+                            Document payload = Protocol.createPayload(result);
+                            output.write(payload.toJson());
+                            output.newLine();
+                            output.flush();
+                            completed = true;
+                            secretKey = null;
+                            break;
+                        }
+
+                    }
+
                 }
-
-                switch (JSON.getString("command")) {
-                    case "AUTH_REQUEST": {
-                        log.info("[Server] A AUTH_REQUEST was received from " + clientHostPort.toString());
-                        Document authorizationRequest = Protocol.createAuthorizationRequest(identity);
-                        messageQueue.offer(authorizationRequest.toJson());
-                        break;
-                    }
-                    case "LIST_PEERS_REQUEST": {
-                        log.info("[Server] A LIST_PEERS_REQUEST was received from " + clientHostPort.toString());
-                        Document listPeersRequest = Protocol.createListPeerRequest();
-                        messageQueue.offer(listPeersRequest.toJson());
-                        break;
-                    }
-                    case "CONNECT_PEER_REQUEST": {
-
-                        log.info("[Server] A CONNECT_PEER_REQUEST was received from " + clientHostPort.toString());
-                        Document connectPeerRequest = Protocol.createConnectPeerRequest(serverHostPort);
-                        messageQueue.offer(connectPeerRequest.toJson());
-                        break;
-                    }
-                    case "DISCONNECT_PEER_REQUEST": {
-                        log.info("[Server] A DISCONNECT_PEER_REQUEST was received from " + clientHostPort.toString());
-                        Document disconnectPeerRequest = Protocol.createDisconnectPeerRequest(serverHostPort);
-                        messageQueue.offer(disconnectPeerRequest.toJson());
-                        break;
-                    }
-                }
-
             }
-        } catch (SocketException | NullPointerException e) {
-            log.info("[Server] Unable to communicate with " + clientHostPort.toString() + ", disconnected!");
-
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        } catch (SocketException | InterruptedException e) {
+            e.printStackTrace();
         } catch (IOException e) {
-            log.info("[Server] Unable to communicate with " + clientHostPort.toString() + ", disconnected!");
+            e.printStackTrace();
+        } catch (Exception e) {
+
         } finally {
-
-            try {
-                senderThread.interrupt();
-                senderThread.join();
-
-            } catch (InterruptedException v) {}
-
-            close();
-        }
-    }
-
-    private void close()
-    {
-        try {
-            input.close();
-            output.close();
-            socket.close();
-
-        } catch (IOException e) {
-            log.info("[Server] Unable to close the socket connecting to " + clientHostPort.toString());
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
         }
     }
 }
+
+

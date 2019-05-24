@@ -112,7 +112,7 @@ public abstract class Server implements FileSystemObserver {
     public abstract void addNewPeer(String peer);
     public abstract void removeFromConnectedPeers(String peer);
     public abstract ArrayList<Document> getConnectedPeerHostPort();
-    public abstract boolean hasConnectedTo(String peer);
-    public abstract boolean hasDisconnectedFrom(String peer);
+    public abstract boolean hasConnectedTo(String host, int port);
+    public abstract boolean hasDisconnectedFrom(String host, int port);
     public abstract void processFileSystemEvent(FileSystemEvent fileSystemEvent);
 }

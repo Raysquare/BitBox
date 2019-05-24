@@ -125,8 +125,8 @@ public class UDPServer extends Server
         return getConnectedPeerHostPort(null);
     }
 
-    public boolean hasConnectedTo(String peer) {
-        HostPort peerHost = new HostPort(peer);
+    public boolean hasConnectedTo(String host,int port) {
+        HostPort peerHost = new HostPort(host,port);
         UDPServerThread serverThread = connectedPeers.get(peerHost);
 
         if(serverThread != null && serverThread.clientSideServerHostPort.equals(peerHost))
@@ -135,8 +135,8 @@ public class UDPServer extends Server
         return false;
     }
 
-    public boolean hasDisconnectedFrom(String peer) {
-        HostPort peerHost = new HostPort(peer);
+    public boolean hasDisconnectedFrom(String host, int port) {
+        HostPort peerHost = new HostPort(host,port);
         UDPServerThread serverThread = connectedPeers.get(peerHost);
 
         return serverThread == null;

@@ -108,7 +108,7 @@ public class BitboxKey {
         return secretKey;
     }
 
-    public static byte[] EncryptSecretKey (PublicKey pub, SecretKey secretKey)
+    public static String EncryptSecretKey (PublicKey pub, SecretKey secretKey)
     {
         Cipher cipher = null;
         byte[] key = null;
@@ -125,11 +125,12 @@ public class BitboxKey {
             System.out.println ( "exception encoding key: " + e.getMessage() );
             e.printStackTrace();
         }
-        return key;
+        return Base64.getEncoder().encodeToString(key);
     }
 
-    public static SecretKey DecryptSecretKey(byte[] content, PrivateKey privateKey) {
+    public static SecretKey DecryptSecretKey(String secretKey_str, PrivateKey privateKey) {
         SecretKey key = null;
+        byte[] content = Base64.getDecoder().decode(secretKey_str);
         try
         {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -294,9 +295,8 @@ public class BitboxKey {
         System.out.println("the public key: \n"+pubkeyencoded);
 
         // Encrypting our secret key
-        byte[] encrpytedkey = EncryptSecretKey(pubkey,secretKey);
-        String encryptedkeystr = Base64.getEncoder().encodeToString(encrpytedkey);
-        System.out.println("the encrypted key: \n"+encryptedkeystr);
+        String encrpytedkey = EncryptSecretKey(pubkey,secretKey);
+        System.out.println("the encrypted key: \n"+encrpytedkey);
 
         // A der file of private key convert to Java private key class
         PrivateKey prikey =getPrivateKey("keyfiles/jajaja_privatekey");

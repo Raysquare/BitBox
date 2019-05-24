@@ -21,6 +21,18 @@ public class Peer
         else
             server = new UDPServer();
 
+        CommandServer commandServer = new CommandServer(server);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    commandServer.start();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
         server.start();
     }
 }
