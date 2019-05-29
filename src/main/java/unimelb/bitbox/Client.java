@@ -83,7 +83,7 @@ public class Client {
                     }
                     case "CONNECT_PEER_RESPONSE": {
                         log.info("[Client] A connect peer response was received from " + serverHost.toString());
-                        log.info(JSON.getString("mes sage"));
+                        log.info(JSON.getString("message"));
                         return;
                     }
                     case "DISCONNECT_PEER_RESPONSE ": {
@@ -96,7 +96,7 @@ public class Client {
             }
         } finally {
             if (socket != null)
-                socket.close()                                                           ;
+                socket.close();
         }
 
     }

@@ -21,6 +21,7 @@ public class Peer
         else
             server = new UDPServer();
 
+
         CommandServer commandServer = new CommandServer(server);
         new Thread(new Runnable() {
             @Override

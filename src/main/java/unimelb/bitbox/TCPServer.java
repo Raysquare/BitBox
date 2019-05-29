@@ -99,8 +99,8 @@ public class TCPServer extends Server
         }
     }
 
-    public boolean hasConnectedTo(String host,int port) {
-        HostPort peerHost = new HostPort(host,port);
+    public boolean hasConnectedTo(String host, int port) {
+        HostPort peerHost = new HostPort(host, port);
 
         synchronized (connectedPeers) {
             for (TCPServerThread serverThread : connectedPeers) {
@@ -113,7 +113,7 @@ public class TCPServer extends Server
     }
 
     public boolean hasDisconnectedFrom(String host, int port) {
-        HostPort peerHost = new HostPort(host,port);
+        HostPort peerHost = new HostPort(host, port);
 
         synchronized (connectedPeers) {
             for (TCPServerThread serverThread : connectedPeers) {

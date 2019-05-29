@@ -77,8 +77,14 @@ public class UDPServer extends Server
 
     public void removeFromConnectedPeers(String peer)
     {
-        HostPort peerHost = new HostPort(peer);
-        connectedPeers.get(peerHost).interrupt();
+        try {
+            HostPort peerHost = new HostPort(peer);
+            peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
+            connectedPeers.get(peerHost).interrupt();
+
+        } catch (UnknownHostException e) {
+            log.info("[LocalPeer] unable to remove the peer from the connected peer list");
+        }
     }
 
     public void addNewPeer(HostPort hostport, UDPServerThread serverThread)
@@ -126,20 +132,34 @@ public class UDPServer extends Server
     }
 
     public boolean hasConnectedTo(String host,int port) {
-        HostPort peerHost = new HostPort(host,port);
-        UDPServerThread serverThread = connectedPeers.get(peerHost);
+        try {
+            HostPort peerHost = new HostPort(host, port);
+            peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
+            UDPServerThread serverThread = connectedPeers.get(peerHost);
 
-        if(serverThread != null && serverThread.clientSideServerHostPort.equals(peerHost))
-            return serverThread.handshakeCompleted;
+            if (serverThread != null && serverThread.clientSideServerHostPort.equals(peerHost))
+                return serverThread.handshakeCompleted;
 
-        return false;
+            return false;
+
+        } catch (UnknownHostException e) {
+            log.info("[LocalPeer] Couldn't find the peer in the connected peer list");
+            return false;
+        }
     }
 
     public boolean hasDisconnectedFrom(String host, int port) {
-        HostPort peerHost = new HostPort(host,port);
-        UDPServerThread serverThread = connectedPeers.get(peerHost);
+        try {
+            HostPort peerHost = new HostPort(host, port);
+            peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
+            UDPServerThread serverThread = connectedPeers.get(peerHost);
 
-        return serverThread == null;
+            return serverThread == null;
+
+        } catch (UnknownHostException e) {
+            log.info("[LocalPeer] Couldn't find the peer in the connected peer list");
+            return false;
+        }
     }
 
     /*

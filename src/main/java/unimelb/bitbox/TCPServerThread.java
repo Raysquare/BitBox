@@ -207,7 +207,8 @@ public class TCPServerThread extends Thread implements FileSystemObserver
 
                     case "HANDSHAKE_RESPONSE": {
                         log.info("[LocalPeer] A handshake response was received from " + clientHostPort.toString());
-                        clientSideServerHostPort = clientHostPort;
+                        Document hostPort = (Document)JSON.get("hostPort");
+                        clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
                         handshakeCompleted = true;
                         peerCandidates.clear();
 
@@ -382,7 +383,7 @@ public class TCPServerThread extends Thread implements FileSystemObserver
                         messageQueue.offer(fileBytesMessage.toJson());
 
                         log.info("[LocalPeer] Sent FILE_BYTES_RESPONSE success to " + clientHostPort.toString());
-                        log.info((fileBytesMessage.toJson()));
+                        //log.info((fileBytesMessage.toJson()));
 
                         break;
                     }

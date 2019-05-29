@@ -59,8 +59,8 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                 sendPacket(request);
 
             } else if (retryRecord.numRetried >= localPeer.udpRetries) {
-             //   retryTimer.cancel();
-             //   this.interrupt();
+                retryTimer.cancel();
+                this.interrupt();
                 log.info("[LocalPeer] Retry fail: " + request);
                 return;
             }
