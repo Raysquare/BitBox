@@ -10,9 +10,10 @@ import unimelb.bitbox.util.HostPort;
 import javax.crypto.SecretKey;
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.logging.Logger;
 
 public class Client {
@@ -36,67 +37,67 @@ public class Client {
 
     public void start() throws IOException {
         try {
+            boolean completed = false;
             socket = new Socket(serverHost.host, serverHost.port);
-            BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
-            BufferedWriter output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
+            BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            BufferedWriter output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
             sendAuthorizationRequest(output);
 
-            while (true) {
+            while (!completed) {
                 String message;
 
-                if (secretKey != null){
+                if (secretKey != null)
                     message = BitboxKey.AES_Decryption(Document.parse(input.readLine()).getString("payload"), secretKey);
-                }
                 else
-                {
                     message = input.readLine();
-                }
 
                 Document JSON = Document.parse(message);
 
                 switch (JSON.getString("command")) {
-                    case "AUTH_RESPONSE":{
+                    case "AUTH_RESPONSE": {
                         log.info("[Client] A auth response was received from " + serverHost.toString());
-                        if(JSON.getBoolean("status"))
-                        {
+                        if (JSON.getBoolean("status")) {
                             String key = JSON.getString("AES128");
                             secretKey = BitboxKey.DecryptSecretKey(key, privateKey);
-                            log.info("[Client] Authorization success" );
+                            log.info("[Client] Authorization success");
                             processCommands(output);
 
-                        }
-                        else
-                        {
-                            log.info(String.format("[Client] Authorization fail because %s" ,JSON.getString("message")));
-                        }
+                        } else
+                            log.info(String.format("[Client] Authorization fail because %s", JSON.getString("message")));
+
                         break;
                     }
                     case "LIST_PEERS_RESPONSE": {
                         log.info("[Client] A list peers response was received from " + serverHost.toString());
-                        for (Document peer : (ArrayList<Document>) JSON.get("peers")) {
+                        for (Document peer : (ArrayList<Document>) JSON.get("peers"))
+                            System.out.println(String.format("%s:%s", peer.getString("host"), peer.getLong("port")));
 
-                            log.info(String.format("[Client] The currently connected peer is %s: %s",
-                                    peer.getString("host"),
-                                    peer.getLong("port")));
-                        }
-                        return;
+                        completed = true;
+                        break;
                     }
                     case "CONNECT_PEER_RESPONSE": {
                         log.info("[Client] A connect peer response was received from " + serverHost.toString());
                         log.info(JSON.getString("message"));
-                        return;
+
+                        completed = true;
+                        break;
                     }
-                    case "DISCONNECT_PEER_RESPONSE ": {
+                    case "DISCONNECT_PEER_RESPONSE": {
                         log.info("[Client] A disconnect peer response was received from " + serverHost.toString());
                         log.info(JSON.getString("message"));
-                        return;
+
+                        completed = true;
+                        break;
                     }
 
                 }
             }
-        } finally {
-            if (socket != null)
-                socket.close();
+
+            input.close();
+            output.close();
+            socket.close();
+        } catch (SocketException e) {
+            e.printStackTrace();
         }
 
     }

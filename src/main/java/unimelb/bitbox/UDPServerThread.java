@@ -1,11 +1,17 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.util.*;
+import unimelb.bitbox.util.Document;
+import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
+import unimelb.bitbox.util.FileSystemObserver;
+import unimelb.bitbox.util.HostPort;
 
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -166,20 +172,10 @@ public class UDPServerThread extends Thread implements FileSystemObserver
 
                 switch (JSON.getString("command")) {
                     case "HANDSHAKE_REQUEST": {
-                        /*
-                        if (handshakeCompleted) {
-                            Document errorMsg = Protocol.createInvalidProtocol("Invalid protocol: handshake has been completed");
-                            sendPacket(errorMsg);
-
-                            log.info("[LocalPeer] Multiple handshakes were received from " + clientHostPort.toString());
-                            log.info("[LocalPeer] Sent INVALID_PROTOCOL to " + clientHostPort.toString());
-                            log.info(errorMsg.toJson());
-                            return;
-                        }
-                        */
                         // store the host port sent from the peer
-                        Document hostPort = (Document)JSON.get("hostPort");
-                        clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
+                        //Document hostPort = (Document)JSON.get("hostPort");
+                        //clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
+                        clientSideServerHostPort = clientHostPort;
 
                         if (localPeer.hasReachedMaxConnections()) {
                             String errorString = "The maximum connections has been reached";

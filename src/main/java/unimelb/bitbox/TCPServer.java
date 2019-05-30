@@ -1,17 +1,18 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.util.*;
+import unimelb.bitbox.util.Configuration;
+import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
+import unimelb.bitbox.util.HostPort;
 
 import javax.net.ServerSocketFactory;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.logging.Logger;
 
 public class TCPServer extends Server
 {
@@ -90,17 +91,28 @@ public class TCPServer extends Server
     public void removeFromConnectedPeers(String peer)
     {
         HostPort peerHost = new HostPort(peer);
+        try {
+            peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
+        } catch (UnknownHostException e) {
+            log.info("[LocalPeer] Unknown host: " + peer);
+        }
 
         synchronized (connectedPeers) {
             for (TCPServerThread serverThread : connectedPeers) {
-                if(serverThread.clientSideServerHostPort.equals(peerHost))
-                    serverThread.interrupt();
+                if(serverThread.clientSideServerHostPort.equals(peerHost)) {
+                    serverThread.close();
+                }
             }
         }
     }
 
     public boolean hasConnectedTo(String host, int port) {
         HostPort peerHost = new HostPort(host, port);
+        try {
+            peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
+        } catch (UnknownHostException e) {
+            log.info("[LocalPeer] Unknown host: " + peerHost.toString());
+        }
 
         synchronized (connectedPeers) {
             for (TCPServerThread serverThread : connectedPeers) {
@@ -114,6 +126,11 @@ public class TCPServer extends Server
 
     public boolean hasDisconnectedFrom(String host, int port) {
         HostPort peerHost = new HostPort(host, port);
+        try {
+            peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
+        } catch (UnknownHostException e) {
+            log.info("[LocalPeer] Unknown host: " + peerHost.toString());
+        }
 
         synchronized (connectedPeers) {
             for (TCPServerThread serverThread : connectedPeers) {

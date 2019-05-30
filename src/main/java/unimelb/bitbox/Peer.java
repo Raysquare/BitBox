@@ -23,15 +23,12 @@ public class Peer
 
 
         CommandServer commandServer = new CommandServer(server);
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        new Thread(() -> {
                 try {
                     commandServer.start();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            }
         }).start();
 
         server.start();

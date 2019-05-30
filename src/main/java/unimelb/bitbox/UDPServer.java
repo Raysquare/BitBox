@@ -1,17 +1,18 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.util.*;
+import unimelb.bitbox.util.Configuration;
+import unimelb.bitbox.util.Document;
 import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
+import unimelb.bitbox.util.HostPort;
 
-import javax.net.ServerSocketFactory;
 import java.io.IOException;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 
 public class UDPServer extends Server
 {
@@ -77,14 +78,17 @@ public class UDPServer extends Server
 
     public void removeFromConnectedPeers(String peer)
     {
+        HostPort peerHost = new HostPort(peer);
         try {
-            HostPort peerHost = new HostPort(peer);
             peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
-            connectedPeers.get(peerHost).interrupt();
-
         } catch (UnknownHostException e) {
-            log.info("[LocalPeer] unable to remove the peer from the connected peer list");
+            log.info("[LocalPeer] Unknown host: " + peer);
         }
+
+        UDPServerThread serverThread = connectedPeers.get(peerHost);
+
+        if (serverThread != null)
+            serverThread.interrupt();
     }
 
     public void addNewPeer(HostPort hostport, UDPServerThread serverThread)
@@ -131,35 +135,34 @@ public class UDPServer extends Server
         return getConnectedPeerHostPort(null);
     }
 
-    public boolean hasConnectedTo(String host,int port) {
+    public boolean hasConnectedTo(String host, int port)
+    {
+        HostPort peerHost = new HostPort(host, port);
         try {
-            HostPort peerHost = new HostPort(host, port);
             peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
-            UDPServerThread serverThread = connectedPeers.get(peerHost);
-
-            if (serverThread != null && serverThread.clientSideServerHostPort.equals(peerHost))
-                return serverThread.handshakeCompleted;
-
-            return false;
-
         } catch (UnknownHostException e) {
-            log.info("[LocalPeer] Couldn't find the peer in the connected peer list");
-            return false;
+            log.info("[LocalPeer] Unknown host: " + peerHost.toString());
         }
+
+        UDPServerThread serverThread = connectedPeers.get(peerHost);
+
+        if (serverThread != null && serverThread.clientSideServerHostPort.equals(peerHost))
+            return serverThread.handshakeCompleted;
+
+        return false;
     }
 
-    public boolean hasDisconnectedFrom(String host, int port) {
+    public boolean hasDisconnectedFrom(String host, int port)
+    {
+        HostPort peerHost = new HostPort(host, port);
         try {
-            HostPort peerHost = new HostPort(host, port);
             peerHost.host = InetAddress.getByName(peerHost.host).getHostAddress();
-            UDPServerThread serverThread = connectedPeers.get(peerHost);
-
-            return serverThread == null;
-
         } catch (UnknownHostException e) {
-            log.info("[LocalPeer] Couldn't find the peer in the connected peer list");
-            return false;
+            log.info("[LocalPeer] Unknown host: " + peerHost.toString());
         }
+
+        UDPServerThread serverThread = connectedPeers.get(peerHost);
+        return serverThread == null;
     }
 
     /*

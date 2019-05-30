@@ -8,8 +8,10 @@ import unimelb.bitbox.util.FileSystemObserver;
 import unimelb.bitbox.util.HostPort;
 
 import java.io.*;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
@@ -129,16 +131,14 @@ public class TCPServerThread extends Thread implements FileSystemObserver
         messageQueue.offer(message.toJson());
     }
 
-    private void close()
+    public void close()
     {
         try {
+            socket.close();
             input.close();
             output.close();
-            socket.close();
 
-        } catch (IOException e) {
-            log.info("[LocalPeer] Unable to close the socket connecting to " + clientHostPort.toString());
-        }
+        } catch (IOException e) {}
     }
 
     /*
@@ -178,6 +178,11 @@ public class TCPServerThread extends Thread implements FileSystemObserver
                         // store the host port sent from the peer
                         Document hostPort = (Document)JSON.get("hostPort");
                         clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
+                        try {
+                            clientSideServerHostPort.host = InetAddress.getByName(clientSideServerHostPort.host).getHostAddress();
+                        } catch (UnknownHostException e) {
+                            log.info("[LocalPeer] Unknown host: " + clientSideServerHostPort.toString());
+                        }
 
                         if (localPeer.hasReachedMaxConnections()) {
                             String errorString = "The maximum connections has been reached";
@@ -209,6 +214,12 @@ public class TCPServerThread extends Thread implements FileSystemObserver
                         log.info("[LocalPeer] A handshake response was received from " + clientHostPort.toString());
                         Document hostPort = (Document)JSON.get("hostPort");
                         clientSideServerHostPort = new HostPort(hostPort.getString("host").trim(), (int)hostPort.getLong("port"));
+                        try {
+                            clientSideServerHostPort.host = InetAddress.getByName(clientSideServerHostPort.host).getHostAddress();
+                        } catch (UnknownHostException e) {
+                            log.info("[LocalPeer] Unknown host: " + clientSideServerHostPort.toString());
+                        }
+
                         handshakeCompleted = true;
                         peerCandidates.clear();
 

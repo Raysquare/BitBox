@@ -5,7 +5,6 @@ import unimelb.bitbox.util.FileSystemManager;
 import unimelb.bitbox.util.FileSystemManager.FileDescriptor;
 import unimelb.bitbox.util.HostPort;
 
-import javax.print.Doc;
 import java.util.ArrayList;
 
 public class Protocol {

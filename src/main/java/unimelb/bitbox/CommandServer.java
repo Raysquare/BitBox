@@ -1,27 +1,21 @@
 package unimelb.bitbox;
 
-import unimelb.bitbox.util.*;
+import unimelb.bitbox.util.BitboxKey;
+import unimelb.bitbox.util.Configuration;
+import unimelb.bitbox.util.Document;
+import unimelb.bitbox.util.HostPort;
 
 import javax.crypto.SecretKey;
 import javax.net.ServerSocketFactory;
-import javax.print.Doc;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Dictionary;
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 
 import static java.lang.Thread.sleep;
-import static unimelb.bitbox.Protocol.createAuthorizationResponse;
 
 public class CommandServer{
 
@@ -64,16 +58,19 @@ public class CommandServer{
             e.printStackTrace();
         }
 
-        try {
-            while (true) {
-                clientSocket = serverSocket.accept();
-                boolean completed = false;
+
+        while (true) {
+            clientSocket = serverSocket.accept();
+            boolean completed = false;
+            secretKey = null;
+
+            try {
                 while (!completed) {
                     String clientAddress = clientSocket.getInetAddress().getHostAddress();
                     int clientPort = clientSocket.getPort();
                     HostPort clientHost = new HostPort(clientAddress, clientPort);
-                    BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
-                    BufferedWriter output = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"));
+                    BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+                    BufferedWriter output = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
                     String message;
 
                     if (secretKey != null) {
@@ -114,7 +111,9 @@ public class CommandServer{
                             output.newLine();
                             output.flush();
                             completed = true;
-                            secretKey = null;
+                            input.close();
+                            output.close();
+                            clientSocket.close();
                             break;
                         }
                         case "CONNECT_PEER_REQUEST": {
@@ -138,20 +137,22 @@ public class CommandServer{
                             output.newLine();
                             output.flush();
                             completed = true;
-                            secretKey = null;
+                            input.close();
+                            output.close();
+                            clientSocket.close();
                             break;
                         }
                         case "DISCONNECT_PEER_REQUEST": {
                             log.info("[CommandServer] A DISCONNECT_PEER_REQUEST was received from " + clientHost.toString());
                             Document hostPort = (Document) JSON.get("hostPort");
                             String host = hostPort.getString("host");
-                            Integer port = hostPort.getInteger("port");
+                            int port = (int) hostPort.getLong("port");
                             HostPort hostPortResponse = new HostPort(host, port);
                             Document disconnectPeerResponse;
                             server.removeFromConnectedPeers(hostPortResponse.toString());
                             sleep(5000);
-                            if (server.hasConnectedTo(host, port)) {
-                                disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, true, "disconnected to peer");
+                            if (server.hasDisconnectedFrom(host, port)) {
+                                disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, true, "disconnected from the peer");
                             } else {
                                 disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, false, "connection still active");
                             }
@@ -162,25 +163,25 @@ public class CommandServer{
                             output.newLine();
                             output.flush();
                             completed = true;
-                            secretKey = null;
+                            input.close();
+                            output.close();
+                            clientSocket.close();
                             break;
                         }
 
                     }
 
                 }
-            }
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        } catch (SocketException | InterruptedException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (Exception e) {
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            } catch (SocketException | InterruptedException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (Exception e) {
 
-        } finally {
-            if (serverSocket != null) {
-                serverSocket.close();
+            } finally {
+                clientSocket.close();
             }
         }
     }

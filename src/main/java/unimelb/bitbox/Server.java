@@ -1,7 +1,7 @@
 package unimelb.bitbox;
 
 import unimelb.bitbox.util.*;
-import unimelb.bitbox.util.FileSystemManager.*;
+import unimelb.bitbox.util.FileSystemManager.FileSystemEvent;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
