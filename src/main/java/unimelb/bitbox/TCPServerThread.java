@@ -51,7 +51,7 @@ public class TCPServerThread extends Thread implements FileSystemObserver
                     String message = messageQueue.poll();
 
                     if (message == null) {
-                        this.sleep(500);
+                       // this.sleep(500);
                         continue;
                     }
 
@@ -60,7 +60,7 @@ public class TCPServerThread extends Thread implements FileSystemObserver
                     output.flush();
                 }
 
-            } catch (InterruptedException | SocketException e) {
+            } catch (SocketException e) {
 
             } catch (IOException e) {
 

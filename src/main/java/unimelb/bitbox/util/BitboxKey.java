@@ -97,7 +97,7 @@ public class BitboxKey {
             e.printStackTrace();
         }
 
-        /* Initializes this key generator for key size to 256. */
+        /* Initializes this key generator for key size to 128. */
         keyGenerator.init(128);
 
         /* Generates a secret key */
@@ -279,6 +279,7 @@ public class BitboxKey {
      * We will delete it after finishing other parts
      * @param args none
      */
+    /*
     public static void main(String args[]) throws Exception {
 
         // Generating AES 128 secret key
@@ -315,4 +316,5 @@ public class BitboxKey {
         String decrypted_str = AES_Decryption(encrypted_str,secretKey);
         System.out.println("Decrypted message is "+ decrypted_str);
     }
+    */
 }

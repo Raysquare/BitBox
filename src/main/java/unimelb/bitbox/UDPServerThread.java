@@ -49,28 +49,27 @@ public class UDPServerThread extends Thread implements FileSystemObserver
 
     private void retryFunction()
     {
-        requestRecords.forEach((request, retryRecord) -> {
+        for (Map.Entry<String, RequestRecord> entry : requestRecords.entrySet()) {
+            String request = entry.getKey();
+            RequestRecord retryRecord = entry.getValue();
+
             long currentTime = new Date().getTime();
 
-            if ((currentTime - retryRecord.timeStamp > localPeer.udpTimeout) &&
-                ((retryRecord.numRetried < localPeer.udpRetries) ||
-                 (!packetQueue.isEmpty()))) {
+            if ((currentTime - retryRecord.timeStamp > localPeer.udpTimeout)
+                 && (retryRecord.numRetried < localPeer.udpRetries)) {
 
-                if (retryRecord.numRetried < localPeer.udpRetries)
-                    retryRecord.numRetried++;
-                else
-                    retryRecord.numRetried = 0;
-
+                retryRecord.numRetried++;
                 retryRecord.timeStamp = currentTime;
                 sendPacket(request);
+                log.info("[LocalPeer] Timed out, resend: " + request);
 
             } else if (retryRecord.numRetried >= localPeer.udpRetries) {
                 retryTimer.cancel();
                 this.interrupt();
-                log.info("[LocalPeer] Retry fail: " + request);
+                log.info("[LocalPeer] Retry failed: " + request);
                 return;
             }
-        });
+        }
     }
 
     public UDPServerThread(UDPServer localPeer, DatagramSocket socket, HostPort serverHostPort, HostPort clientHostPort)
@@ -99,7 +98,7 @@ public class UDPServerThread extends Thread implements FileSystemObserver
             socket.send(packet);
 
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
             this.interrupt();
         }
     }
@@ -152,7 +151,7 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                 DatagramPacket packet = packetQueue.poll();
 
                 if (packet == null) {
-                    sleep(10);
+                    //sleep(10);
                     continue;
                 }
 
@@ -372,7 +371,7 @@ public class UDPServerThread extends Thread implements FileSystemObserver
 
                         String pathName = JSON.getString("pathName");
                         long position = JSON.getLong("position");
-                        long length = Math.min(JSON.getLong("length"), localPeer.blockSize);
+                        long length = JSON.getLong("length");
                         FileDescriptor fileDescriptor = Protocol.createFileDescriptorFromDocument(fileSystemManager, JSON);
 
                         byte[] bytes = fileSystemManager.readFile(fileDescriptor.md5, position, length).array();
@@ -655,11 +654,11 @@ public class UDPServerThread extends Thread implements FileSystemObserver
                     }
                 }
             }
-        } catch (SocketException | NullPointerException | InterruptedException e) {
-            e.printStackTrace();
+        } catch (SocketException | NullPointerException e) {
+            //e.printStackTrace();
 
         } catch (IOException | NoSuchAlgorithmException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
 
         } finally {
             log.info("[LocalPeer] Unable to communicate with " + clientHostPort.toString() + ", disconnected!");

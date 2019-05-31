@@ -107,6 +107,7 @@ public class Protocol {
             case "DIRECTORY_DELETE_RESPONSE":
                 return (message.containsKey("pathName") && message.containsKey("message") && message.containsKey("status"));
 
+            /*
             case "AUTH_REQUEST":
                 return message.containsKey("identity");
 
@@ -140,6 +141,7 @@ public class Protocol {
                 }
                 return false;
 
+            */
         }
 
         return false;
@@ -444,7 +446,3 @@ public class Protocol {
         return JSON;
     }
 }
-
-
-
-

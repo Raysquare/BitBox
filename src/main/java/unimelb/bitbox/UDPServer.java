@@ -39,7 +39,7 @@ public class UDPServer extends Server
         setTimerForGenerateSyncEvents();
 
         while (true) {
-            byte[] buffer = new byte[8192];
+            byte[] buffer = new byte[65535];
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
             socket.receive(packet);
@@ -146,7 +146,7 @@ public class UDPServer extends Server
 
         UDPServerThread serverThread = connectedPeers.get(peerHost);
 
-        if (serverThread != null && serverThread.clientSideServerHostPort.equals(peerHost))
+        if (serverThread != null && peerHost.equals(serverThread.clientSideServerHostPort))
             return serverThread.handshakeCompleted;
 
         return false;

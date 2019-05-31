@@ -20,29 +20,27 @@ import static java.lang.Thread.sleep;
 public class CommandServer{
 
     private Socket clientSocket;
+    private BufferedReader input;
+    private BufferedWriter output;
     private Server server;
     private int localport;
-
-    private static final Logger log = Logger.getLogger(CommandServer.class.getName());
-    private HashMap<String, String> keyIdentityList = new HashMap<String, String>();
-    private String publicKey;
     private SecretKey secretKey;
-    private String identity;
+
+    private HashMap<String, String> keyIdentityList = new HashMap<String, String>();
+    private static final Logger log = Logger.getLogger(CommandServer.class.getName());
 
     public CommandServer(Server peerServer)
     {
-        clientSocket = null;
         server = peerServer;
         localport = Integer.parseInt(Configuration.getConfigurationValue("clientPort"));
         String keys = Configuration.getConfigurationValue("authorized_keys");
         String[] splitKey = keys.split(",");
         createIdentities(splitKey);
-
     }
 
     public void createIdentities(String[] splitKey){
         for (int index = 0; index < splitKey.length; index ++){
-            String[] keyIdentity = splitKey[index].split(" ");
+            String[] keyIdentity = splitKey[index].trim().split(" ");
             String key = splitKey[index];
             String identity = keyIdentity[2];
             keyIdentityList.put(identity, key);
@@ -55,7 +53,9 @@ public class CommandServer{
         try {
             serverSocket = factory.createServerSocket(localport);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.info("[CommandServer] Unable to bind to the port");
+            return;
+            //e.printStackTrace();
         }
 
 
@@ -65,40 +65,43 @@ public class CommandServer{
             secretKey = null;
 
             try {
+                String clientAddress = clientSocket.getInetAddress().getHostAddress();
+                int clientPort = clientSocket.getPort();
+                HostPort clientHost = new HostPort(clientAddress, clientPort);
+                input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+                output = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
+
                 while (!completed) {
-                    String clientAddress = clientSocket.getInetAddress().getHostAddress();
-                    int clientPort = clientSocket.getPort();
-                    HostPort clientHost = new HostPort(clientAddress, clientPort);
-                    BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
-                    BufferedWriter output = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
                     String message;
 
-                    if (secretKey != null) {
+                    if (secretKey != null)
                         message = BitboxKey.AES_Decryption(Document.parse(input.readLine()).getString("payload"), secretKey);
-                    } else {
+                    else
                         message = input.readLine();
-                    }
 
                     Document JSON = Document.parse(message);
 
                     switch (JSON.getString("command")) {
                         case "AUTH_REQUEST": {
                             log.info("[CommandSever] A auth request was received from " + clientHost.toString());
+
                             if (keyIdentityList.containsKey(JSON.getString("identity"))) {
-                                identity = JSON.getString("identity");
-                                publicKey = keyIdentityList.get(identity);
+                                String identity = JSON.getString("identity");
+                                String publicKey = keyIdentityList.get(identity);
                                 secretKey = BitboxKey.generateSecretKey();
                                 String key = BitboxKey.EncryptSecretKey(BitboxKey.StringToPublicKey(publicKey), secretKey);
-                                Document authResponse = Protocol.createAuthorizationResponse(key, true, "public key found");
+                                Document authResponse = Protocol.createAuthorizationResponse(key, true, "public key is found");
                                 output.write(authResponse.toJson());
                                 output.newLine();
                                 output.flush();
+
                             } else {
-                                Document authResponse = Protocol.createAuthorizationResponse(false, "public key not found");
+                                Document authResponse = Protocol.createAuthorizationResponse(false, "public key isn't found");
                                 output.write(authResponse.toJson());
                                 output.newLine();
                                 output.flush();
-                                log.info("[CommandServer] public key not found");
+                                log.info("[CommandServer] public key isn't found");
+                                completed = true;
                             }
                             break;
                         }
@@ -111,9 +114,6 @@ public class CommandServer{
                             output.newLine();
                             output.flush();
                             completed = true;
-                            input.close();
-                            output.close();
-                            clientSocket.close();
                             break;
                         }
                         case "CONNECT_PEER_REQUEST": {
@@ -125,11 +125,10 @@ public class CommandServer{
                             Document connectPeerResponse;
                             server.addNewPeer(hostPortResponse.toString());
                             sleep(5000);
-                            if (server.hasConnectedTo(host, port)) {
-                                connectPeerResponse = Protocol.createConnectPeerResponse(hostPortResponse, true, "connected to peer");
-                            } else {
-                                connectPeerResponse = Protocol.createConnectPeerResponse(hostPortResponse, false, "connection failed");
-                            }
+                            if (server.hasConnectedTo(host, port))
+                                connectPeerResponse = Protocol.createConnectPeerResponse(hostPortResponse, true, "Successfully connected to " + hostPortResponse.toString());
+                            else
+                                connectPeerResponse = Protocol.createConnectPeerResponse(hostPortResponse, false, "Failed to connect to " + hostPortResponse.toString());
 
                             String result = BitboxKey.AES_Encryption(connectPeerResponse.toJson(), secretKey);
                             Document payload = Protocol.createPayload(result);
@@ -137,9 +136,6 @@ public class CommandServer{
                             output.newLine();
                             output.flush();
                             completed = true;
-                            input.close();
-                            output.close();
-                            clientSocket.close();
                             break;
                         }
                         case "DISCONNECT_PEER_REQUEST": {
@@ -151,11 +147,10 @@ public class CommandServer{
                             Document disconnectPeerResponse;
                             server.removeFromConnectedPeers(hostPortResponse.toString());
                             sleep(5000);
-                            if (server.hasDisconnectedFrom(host, port)) {
-                                disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, true, "disconnected from the peer");
-                            } else {
-                                disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, false, "connection still active");
-                            }
+                            if (server.hasDisconnectedFrom(host, port))
+                                disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, true, "Successfully disconnected from " + hostPortResponse.toString());
+                            else
+                                disconnectPeerResponse = Protocol.createDisconnectPeerResponse(hostPortResponse, false, "Failed to disconnected from " + hostPortResponse.toString());
 
                             String result = BitboxKey.AES_Encryption(disconnectPeerResponse.toJson(), secretKey);
                             Document payload = Protocol.createPayload(result);
@@ -163,28 +158,21 @@ public class CommandServer{
                             output.newLine();
                             output.flush();
                             completed = true;
-                            input.close();
-                            output.close();
-                            clientSocket.close();
                             break;
                         }
-
                     }
-
                 }
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-            } catch (SocketException | InterruptedException e) {
-                e.printStackTrace();
+            } catch (UnsupportedEncodingException | SocketException | InterruptedException e) {
+                //e.printStackTrace();
             } catch (IOException e) {
-                e.printStackTrace();
+                //e.printStackTrace();
             } catch (Exception e) {
 
             } finally {
+                input.close();
+                output.close();
                 clientSocket.close();
             }
         }
     }
 }
-
-
