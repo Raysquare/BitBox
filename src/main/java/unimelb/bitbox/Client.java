@@ -129,6 +129,7 @@ public class Client {
             output.write(payload.toJson());
             output.newLine();
             output.flush();
+            System.out.println("Please wait 5 seconds......");
 
         } else if (command.equals("disconnect_peer")){
             log.info("[Client] Sending DISCONNECT_PEER_REQUEST to:" + serverHost.toString());
@@ -138,9 +139,8 @@ public class Client {
             output.write(payload.toJson());
             output.newLine();
             output.flush();
+            System.out.println("Please wait 5 seconds......");
         }
-
-        System.out.println("Please wait 5 seconds......");
     }
 
     private void sendAuthorizationRequest() throws IOException
