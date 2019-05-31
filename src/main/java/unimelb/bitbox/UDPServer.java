@@ -107,10 +107,10 @@ public class UDPServer extends Server
             serverThread.start();
             connectedPeers.put(clientHost, serverThread);
 
-            log.info("[LocalPeer] Connected to " + peer);
+            log.info("[LocalPeer] Sent handshake request to " + peer);
 
         } catch (IOException e) {
-            log.info("[LocalPeer] Failed to connect to " + peer);
+            log.info("[LocalPeer] UnknownHost: " + peer);
         }
     }
 
