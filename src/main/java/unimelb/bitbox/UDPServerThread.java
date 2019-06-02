@@ -49,9 +49,11 @@ public class UDPServerThread extends Thread implements FileSystemObserver
 
     private void retryFunction()
     {
-        for (Map.Entry<String, RequestRecord> entry : requestRecords.entrySet()) {
-            String request = entry.getKey();
-            RequestRecord retryRecord = entry.getValue();
+        for (String request : requestRecords.keySet()) {
+            RequestRecord retryRecord = requestRecords.get(request);
+
+            if (retryRecord == null)
+                continue;
 
             long currentTime = new Date().getTime();
 
