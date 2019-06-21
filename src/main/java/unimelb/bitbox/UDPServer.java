@@ -123,7 +123,7 @@ public class UDPServer extends Server
         ArrayList<Document> hostPorts = new ArrayList<Document>(connectedPeers.size());
 
         for (UDPServerThread peer : connectedPeers.values()) {
-            if (!peer.clientSideServerHostPort.equals(hostPort))
+            if (peer.clientSideServerHostPort != null && !hostPort.equals(peer.clientSideServerHostPort))
                 hostPorts.add(peer.clientSideServerHostPort.toDoc());
         }
 

@@ -99,7 +99,7 @@ public class TCPServer extends Server
 
         synchronized (connectedPeers) {
             for (TCPServerThread serverThread : connectedPeers) {
-                if(serverThread.clientSideServerHostPort.equals(peerHost)) {
+                if(peerHost.equals(serverThread.clientSideServerHostPort)) {
                     serverThread.close();
                 }
             }
@@ -116,7 +116,7 @@ public class TCPServer extends Server
 
         synchronized (connectedPeers) {
             for (TCPServerThread serverThread : connectedPeers) {
-                if(serverThread.clientSideServerHostPort.equals(peerHost))
+                if(peerHost.equals(serverThread.clientSideServerHostPort))
                     return serverThread.handshakeCompleted;
             }
         }
@@ -134,7 +134,7 @@ public class TCPServer extends Server
 
         synchronized (connectedPeers) {
             for (TCPServerThread serverThread : connectedPeers) {
-                if(serverThread.clientSideServerHostPort.equals(peerHost))
+                if(peerHost.equals(serverThread.clientSideServerHostPort))
                     return false;
             }
         }
@@ -152,7 +152,7 @@ public class TCPServer extends Server
             ArrayList<Document> hostPorts = new ArrayList<Document>(connectedPeers.size());
 
             for (TCPServerThread peer : connectedPeers) {
-                if (!peer.clientSideServerHostPort.equals(hostPort))
+                if (peer.clientSideServerHostPort != null && !hostPort.equals(peer.clientSideServerHostPort))
                     hostPorts.add(peer.clientSideServerHostPort.toDoc());
             }
 
